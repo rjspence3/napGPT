@@ -1,0 +1,85 @@
+name: UI MCP Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Start application
+        run: |
+          pnpm start &
+          npx wait-on http://localhost:3000 --timeout 60000
+        env:
+          PORT: 3000
+
+      - name: Install Chrome dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2
+
+      - name: Run MCP tests
+        run: pnpm test:mcp
+        env:
+          HEADFUL: 0
+          E2E_BASE_URL: http://localhost:3000
+
+      - name: Generate report
+        run: pnpm test:mcp:report
+        continue-on-error: true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-test-artifacts
+          path: |
+            artifacts/**
+          retention-days: 7
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-test-results
+          path: |
+            artifacts/*/results.json
+            artifacts/report.md
+          retention-days: 30
+
+

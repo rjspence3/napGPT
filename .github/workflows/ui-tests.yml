@@ -1,0 +1,132 @@
+name: UI Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  ui-tests:
+    name: UI Tests (${{ matrix.os }} - ${{ matrix.mode }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        mode: [headless, headful]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build app
+        run: npm run build
+      
+      - name: Start fake LLM server
+        run: npm run test:serve-llm &
+        env:
+          LLM_SERVER_PORT: 3001
+      
+      - name: Run UI tests
+        run: |
+          if [ "${{ matrix.mode }}" == "headful" ]; then
+            HEADFUL=1 npm run test:ui-all
+          else
+            npm run test:ui-all
+          fi
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          LLM_BASE_URL: http://localhost:3001
+          UI_ARTIFACT_DIR: artifacts/ui-test
+      
+      - name: Run Live LLM tests (if key provided)
+        if: ${{ secrets.LIVE_LLM == '1' }}
+        run: |
+          if [ "${{ matrix.mode }}" == "headful" ]; then
+            HEADFUL=1 npm run test:ui-live
+          else
+            npm run test:ui-live
+          fi
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          LIVE_LLM: '1'
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'openai' }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL || 'gpt-4o-mini' }}
+          LLM_MAX_TOKENS: 128
+          LLM_MAX_REQUESTS: 3
+          NAPGPT_TEST_SEED: 1337
+          NAPGPT_DISABLE_DREAM_DRIFT: 1
+          NAPGPT_DISABLE_SHEEP: 1
+          UI_ARTIFACT_DIR: artifacts/ui-test
+      
+      - name: Run Live LLM Matrix (nightly only)
+        if: ${{ secrets.LIVE_LLM == '1' && github.event_name == 'schedule' }}
+        run: npm run test:ui-live:matrix
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          LIVE_LLM: '1'
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'openai' }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MAX_TOKENS: 128
+          LLM_MAX_REQUESTS: 10
+          NAPGPT_TEST_SEED: 1337
+          NAPGPT_DISABLE_DREAM_DRIFT: 1
+          NAPGPT_DISABLE_SHEEP: 1
+          UI_ARTIFACT_DIR: artifacts/ui-test
+      
+      - name: Upload artifacts (on failure or nightly)
+        if: failure() || github.event_name == 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-artifacts-${{ matrix.os }}-${{ matrix.mode }}
+          path: |
+            artifacts/ui-test/screens/**
+            artifacts/ui-test/har/**
+            artifacts/ui-test/logs/**
+            artifacts/ui-test/video/**
+            artifacts/ui-test/trace/**
+            artifacts/ui-test/metrics.json
+            artifacts/lighthouse/**
+          retention-days: 7
+  
+  lighthouse-ci:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build app
+        run: npm run build
+      
+      - name: Run Lighthouse CI
+        run: npm run ci:lighthouse
+      
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: artifacts/lighthouse/**
+          retention-days: 30
+

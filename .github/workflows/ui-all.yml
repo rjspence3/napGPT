@@ -1,0 +1,152 @@
+name: UI Tests (Full Suite)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  ui-ui:
+    name: UI Tests (PR)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build app
+        run: npm run build
+      
+      - name: Start app
+        run: npm run start &
+        env:
+          PORT: 3000
+      
+      - name: Wait for app
+        run: |
+          timeout=60
+          elapsed=0
+          while ! curl -f http://localhost:3000 > /dev/null 2>&1; do
+            if [ $elapsed -ge $timeout ]; then
+              echo "App failed to start"
+              exit 1
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
+      
+      - name: Run UI tests (headless)
+        run: npm run test:ui:headless
+        env:
+          BASE_URL: http://localhost:3000
+          HEADFUL: '0'
+          LIVE_LLM: '0'
+          NAPGPT_TEST_SEED: 1337
+          NAPGPT_DISABLE_DREAM_DRIFT: 1
+          NAPGPT_DISABLE_SHEEP: 1
+      
+      - name: Upload artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-artifacts-pr
+          path: |
+            artifacts/latest/**
+          retention-days: 7
+  
+  ui-nightly:
+    name: UI Tests (Nightly)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: headless
+            headful: '0'
+          - mode: headful
+            headful: '1'
+          - provider: openai
+            model: gpt-4o-mini
+            live: '1'
+          - provider: anthropic
+            model: claude-3-haiku
+            live: '1'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build app
+        run: npm run build
+      
+      - name: Start app
+        run: npm run start &
+        env:
+          PORT: 3000
+      
+      - name: Wait for app
+        run: |
+          timeout=60
+          elapsed=0
+          while ! curl -f http://localhost:3000 > /dev/null 2>&1; do
+            if [ $elapsed -ge $timeout ]; then
+              echo "App failed to start"
+              exit 1
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
+      
+      - name: Run UI tests
+        run: |
+          if [ "${{ matrix.live }}" == "1" ]; then
+            LIVE_LLM=1 MODEL_MATRIX="${{ matrix.provider }}:${{ matrix.model }}" npm run test:ui:live
+          else
+            HEADFUL=${{ matrix.headful }} npm run test:ui:headless
+          fi
+        env:
+          BASE_URL: http://localhost:3000
+          HEADFUL: ${{ matrix.headful }}
+          LIVE_LLM: ${{ matrix.live || '0' }}
+          LLM_PROVIDER: ${{ matrix.provider || '' }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ matrix.model || '' }}
+          LLM_MAX_TOKENS: 128
+          LLM_MAX_REQUESTS: 10
+          NAPGPT_TEST_SEED: 1337
+          NAPGPT_DISABLE_DREAM_DRIFT: 1
+          NAPGPT_DISABLE_SHEEP: 1
+      
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-artifacts-${{ matrix.mode || matrix.provider }}-${{ matrix.model || 'nightly' }}
+          path: |
+            artifacts/latest/**
+          retention-days: 30
+

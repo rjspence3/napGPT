@@ -1,0 +1,242 @@
+# Capability → Test ID mapping for traceability
+# Fails if coverage drops below listed tests
+
+capabilities:
+  # UI Element Tests (35 tests from test-all-ui-elements.ts)
+  - id: header-title
+    testId: "Header: NapGPT title exists"
+    priority: P0
+    
+  - id: header-visible
+    testId: "Header: Title is visible"
+    priority: P0
+    
+  - id: energy-meter-bar
+    testId: "EnergyMeter: Bar element exists"
+    priority: P0
+    
+  - id: energy-meter-aria
+    testId: "EnergyMeter: Bar has correct ARIA attributes"
+    priority: P0
+    
+  - id: energy-meter-percentage
+    testId: "EnergyMeter: Energy percentage displays"
+    priority: P0
+    
+  - id: energy-meter-dynamic
+    testId: "EnergyMeter: Bar width updates with energy"
+    priority: P1
+    
+  - id: chat-input-exists
+    testId: "ChatWindow: Input field exists"
+    priority: P0
+    
+  - id: chat-input-enabled
+    testId: "ChatWindow: Input field is enabled initially"
+    priority: P0
+    
+  - id: chat-send-button
+    testId: "ChatWindow: Send button exists"
+    priority: P0
+    
+  - id: chat-send-disabled-empty
+    testId: "ChatWindow: Send button is disabled when input is empty"
+    priority: P0
+    
+  - id: chat-send-enabled-typing
+    testId: "ChatWindow: Send button enables when typing"
+    priority: P0
+    
+  - id: chat-send-message
+    testId: "ChatWindow: Can send a message"
+    priority: P0
+    
+  - id: chat-input-clears
+    testId: "ChatWindow: Input clears after send"
+    priority: P0
+    
+  - id: chat-assistant-response
+    testId: "ChatWindow: Assistant message appears"
+    priority: P0
+    
+  - id: effort-slider-exists
+    testId: "EffortBar: Slider exists"
+    priority: P0
+    
+  - id: effort-slider-range
+    testId: "EffortBar: Slider has correct range"
+    priority: P0
+    
+  - id: effort-slider-updates-label
+    testId: "EffortBar: Slider value updates label"
+    priority: P0
+    
+  - id: boost-button-exists
+    testId: "EffortBar: Boost button exists"
+    priority: P0
+    
+  - id: boost-button-cooldown
+    testId: "EffortBar: Boost button disables on click"
+    priority: P0
+    
+  - id: nap-toggle-exists
+    testId: "EffortBar: Nap toggle exists"
+    priority: P0
+    
+  # Network Verification Tests
+  - id: network-post-capture
+    testId: "should capture POST body and verify network round-trip"
+    priority: P0
+    
+  - id: network-streaming-detection
+    testId: "should detect streaming response (SSE chunks)"
+    priority: P1
+    
+  - id: network-button-state
+    testId: "should verify send button disabled during request"
+    priority: P0
+    
+  # Overlay Tests
+  - id: overlay-nap
+    testId: "should show nap overlay with before/during/after screenshots"
+    priority: P0
+    
+  - id: overlay-idle
+    testId: "should show idle overlay when nap timer enabled"
+    priority: P1
+    
+  - id: overlay-boost-cooldown
+    testId: "should handle boost cooldown state"
+    priority: P0
+    
+  # Accessibility Tests
+  - id: a11y-initial-page
+    testId: "should have zero P0 violations on initial page"
+    priority: P0
+    
+  - id: a11y-p0-elements
+    testId: "should have zero P0 violations on P0 elements"
+    priority: P0
+    
+  - id: a11y-with-messages
+    testId: "should have zero P0 violations with messages"
+    priority: P0
+    
+  - id: a11y-nap-overlay
+    testId: "should have zero P0 violations with nap overlay"
+    priority: P0
+    
+  # Visual Regression Tests
+  - id: visual-initial-empty
+    testId: "initial empty state"
+    priority: P1
+    
+  - id: visual-typing-state
+    testId: "typing state - input focused"
+    priority: P1
+    
+  - id: visual-nap-overlay
+    testId: "nap overlay state"
+    priority: P0
+    
+  - id: visual-idle-overlay
+    testId: "idle overlay state"
+    priority: P1
+    
+  - id: visual-effort-5
+    testId: "effort slider at 5"
+    priority: P1
+    
+  - id: visual-effort-60
+    testId: "effort slider at 60"
+    priority: P1
+    
+  - id: visual-effort-92
+    testId: "effort slider at 92"
+    priority: P1
+    
+  - id: visual-boost-disabled
+    testId: "boost button disabled (cooldown)"
+    priority: P0
+    
+  - id: visual-with-messages
+    testId: "with messages state"
+    priority: P1
+
+  # New API Endpoint Tests
+  - id: api-put-chat
+    testId: "95_api_endpoints: PUT /api/chat (boost cookie)"
+    priority: P0
+    
+  - id: api-delete-chat
+    testId: "95_api_endpoints: DELETE /api/chat (rate limit clearing)"
+    priority: P0
+    
+  - id: api-get-mode
+    testId: "95_api_endpoints: GET /api/mode"
+    priority: P0
+
+  # Engine Feature Tests
+  - id: wake-reactions
+    testId: "96_wake_reactions: Wake keyword detection"
+    priority: P1
+    
+  - id: echo-fragments
+    testId: "97_echo_fragments: Prior-turn reference fragments"
+    priority: P1
+    
+  - id: self-references
+    testId: "98_self_references: Self-reference fragments"
+    priority: P1
+    
+  - id: recall-command
+    testId: "99_recall_command: /recall command"
+    priority: P1
+
+  # UI Interaction Tests
+  - id: ui-keyboard-shortcuts
+    testId: "100_ui_interactions: Keyboard shortcuts (Enter to send)"
+    priority: P0
+    
+  - id: ui-message-alignment
+    testId: "100_ui_interactions: Message alignment (user right, assistant left)"
+    priority: P0
+    
+  - id: ui-input-focus
+    testId: "100_ui_interactions: Input focus management"
+    priority: P1
+    
+  - id: ui-scroll-behavior
+    testId: "100_ui_interactions: Scroll to bottom behavior"
+    priority: P1
+
+  # Edge Case Tests
+  - id: edge-effort-boundaries
+    testId: "101_edge_cases: Effort boundaries (0, 100)"
+    priority: P0
+    
+  - id: edge-empty-input
+    testId: "101_edge_cases: Empty input handling"
+    priority: P0
+    
+  - id: edge-long-messages
+    testId: "101_edge_cases: Very long messages"
+    priority: P1
+    
+  - id: edge-special-characters
+    testId: "101_edge_cases: Special characters and emojis"
+    priority: P1
+    
+  - id: edge-rapid-clicks
+    testId: "101_edge_cases: Rapid clicks protection"
+    priority: P1
+
+  # Network Error Tests
+  - id: network-rate-limit
+    testId: "102_network_errors: Rate limiting (429)"
+    priority: P0
+    
+  - id: network-invalid-request
+    testId: "102_network_errors: Invalid request handling (400)"
+    priority: P0
+
