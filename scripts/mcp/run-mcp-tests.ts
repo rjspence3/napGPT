@@ -19,6 +19,7 @@ import { runEnergyMeterTest } from "./scenarios/40_energy_meter";
 import { runCommandsDreamNapTest } from "./scenarios/50_commands_dream_nap";
 import { runBlanketModeTest } from "./scenarios/25_blanket_mode";
 import { runCoffeeEconomyTest } from "./scenarios/35_coffee_economy";
+import { runToastBoostRefusedTest } from "./scenarios/36_toast_boost_refused";
 import { runDreamDriftTest } from "./scenarios/55_dream_drift";
 import { runContextThreadingTest } from "./scenarios/60_context_threading";
 import { runErrorAndRetryTest } from "./scenarios/70_error_and_retry";
@@ -32,6 +33,7 @@ const SCENARIOS = [
   { name: "25_blanket_mode", fn: runBlanketModeTest, description: "Blanket Mode: Visual overlay based on effort and idle state" },
   { name: "30_idle_and_overlay", fn: runIdleAndOverlayTest, description: "Idle overlay and nap timer" },
   { name: "35_coffee_economy", fn: runCoffeeEconomyTest, description: "Coffee Economy: Bean currency for Boost button" },
+  { name: "36_toast_boost_refused", fn: runToastBoostRefusedTest, description: "Toast notification when boost is refused due to insufficient beans" },
   { name: "40_energy_meter", fn: runEnergyMeterTest, description: "Energy meter draining and refilling" },
   { name: "50_commands_dream_nap", fn: runCommandsDreamNapTest, description: "/dream and /nap commands" },
   { name: "55_dream_drift", fn: runDreamDriftTest, description: "Dream Drift: Whimsical fragments appended to replies" },
@@ -63,6 +65,30 @@ async function main() {
     client = await createMCPClient(config.baseUrl, headless);
     console.log("✅ Chrome ready\n");
 
+    // Navigate to base URL once (shared across scenarios for test isolation)
+    console.log(`🌐 Navigating to ${config.baseUrl}...`);
+    try {
+      await client.goto(config.baseUrl);
+      // Wait for React hydration
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Verify page loaded by checking for a key element
+      const page = (client as any).page;
+      if (page) {
+        try {
+          await page.waitForSelector('[data-testid="chat-input"]', { timeout: 10000 });
+          console.log("✅ Page loaded and React hydrated\n");
+        } catch (e) {
+          console.warn("⚠️  Page loaded but chat-input not found - may still be loading\n");
+        }
+      } else {
+        console.log("✅ Page loaded\n");
+      }
+    } catch (error: any) {
+      console.error(`❌ Failed to navigate: ${error.message}`);
+      throw error;
+    }
+
     // Run each scenario
     for (let i = 0; i < SCENARIOS.length; i++) {
       const scenario = SCENARIOS[i];
@@ -71,6 +97,29 @@ async function main() {
       console.log("=".repeat(60));
 
       try {
+        // Reset state before each scenario
+        await client.evaluate(() => {
+          const store = (window as any).__nap_store;
+          if (store) {
+            store.setState({
+              effort: 50,
+              energy: 100,
+              idleSince: null,
+              isNapping: false,
+              boostCooldown: 0,
+              boostCooldownUntil: 0,
+              napTimerEnabled: false,
+              blanketOn: false,
+              beans: 3
+            });
+          }
+          // Also clear local storage
+          localStorage.clear();
+          sessionStorage.clear();
+        });
+        // Small delay for state to settle
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
         const result = await scenario.fn(client);
         result.scenario = scenario.name;
         result.description = scenario.description;

@@ -7,10 +7,10 @@ import {
   detectMicroIntent,
   summarizeReply,
   splitOnPunctuation,
-  testRandom,
-  setTestRandom,
+  lazinessCurve,
   type MicroIntent,
 } from "./utils";
+import { getTestRandom, setSeed } from "@/lib/utils/testRandom";
 import { classifyIntent, type Intent } from "./intent";
 import { getConfig, type TestConfigOverrides } from "./config";
 import {
@@ -19,10 +19,6 @@ import {
   MICRO_MODES,
   FALLBACK_MESSAGES,
   REFUSAL_VARIANTS,
-  DRIFT_FRAGMENTS,
-  WAKE_REACTIONS,
-  ECHO_FRAGMENTS,
-  SELF_REFERENCES,
   renderSelfRef,
   stopSequences,
   RECALL_TEMPLATE,
@@ -35,6 +31,17 @@ import {
   resetConversationState,
 } from "./conversation-state";
 import { preprocessCommands } from "./utils";
+import { PipelineContext, Processor } from "./pipeline/types";
+import {
+  WakeReactionProcessor,
+  SelfReferenceProcessor,
+  DropoutProcessor,
+  NonSequiturProcessor,
+  SleepySignOffProcessor,
+  DreamDriftProcessor,
+  EchoFragmentProcessor,
+  TruncationProcessor,
+} from "./pipeline/processors";
 
 export interface NapResponse {
   text: string;
@@ -113,16 +120,6 @@ function bandFor(effort: number): BandConfig {
   return band || BAND_TABLE[BAND_TABLE.length - 1];
 }
 
-/**
- * Non-linear laziness curve
- * Lower effort suppresses length sharply, high effort ramps quickly
- */
-export function lazinessCurve(effort: number): number {
-  // S-curve: y = (effort/100)^1.7
-  const y = Math.pow(effort / 100, 1.7);
-  return Math.min(1, Math.max(0, y));
-}
-
 function buildSystemPrompt({
   effort,
   dream,
@@ -156,7 +153,7 @@ function buildSystemPrompt({
 function fallbackLine(strategy: Strategy, intent: Intent, config: ReturnType<typeof getConfig>): string {
   // Use rich refusal variants if enabled
   if (strategy === "refuse" && config.ENABLE_RICH_REFUSALS) {
-    const variant = REFUSAL_VARIANTS[Math.floor(testRandom() * REFUSAL_VARIANTS.length)];
+    const variant = REFUSAL_VARIANTS[Math.floor(getTestRandom() * REFUSAL_VARIANTS.length)];
     return variant;
   }
 
@@ -180,14 +177,63 @@ function handleRecallCommand(): string {
   return RECALL_NO_MEMORY;
 }
 
+/**
+ * Main response generation function for NapGPT
+ * 
+ * Handles effort-based response generation with various strategies:
+ * - Refuse: Low effort responses that decline to help
+ * - One-liner: Very brief responses
+ * - Lazy-help: Moderate effort responses with some detail
+ * - Full-help: High effort comprehensive responses
+ * 
+ * Applies various post-processing effects:
+ * - Dream drift: Whimsical fragments for dream mode
+ * - Wake reactions: Responses to urgent keywords
+ * - Self-references: Occasional meta-commentary
+ * - Dropout: Mid-reply truncation for low effort
+ * - Non-sequiturs: Random tangents
+ * 
+ * @param options - Configuration for response generation
+ * @returns Promise resolving to NapResponse with text and metadata
+ */
+/**
+ * Main response generation function for NapGPT
+ * 
+ * Handles effort-based response generation with various strategies:
+ * - Refuse: Low effort responses that decline to help
+ * - One-liner: Very brief responses
+ * - Lazy-help: Moderate effort responses with some detail
+ * - Full-help: High effort comprehensive responses
+ * 
+ * Applies various post-processing effects via a pipeline:
+ * - Wake reactions
+ * - Self-references
+ * - Dropout
+ * - Non-sequiturs
+ * - Dream drift
+ * - Echo fragments
+ * - Truncation
+ * 
+ * @param options - Configuration for response generation
+ * @returns Promise resolving to NapResponse with text and metadata
+ */
 export async function respond(options: NapOptions): Promise<NapResponse> {
   const { messages, effort: baseEffort, wakeBoost = 0, flags = {}, testConfig = {} } = options;
 
   // Get configuration with test overrides
   const config = getConfig(testConfig);
 
-  // Set test RNG if provided
+  // Set test RNG seed if provided
+  if (process.env.NAPGPT_TEST_SEED) {
+    const seed = parseInt(process.env.NAPGPT_TEST_SEED, 10);
+    if (!isNaN(seed)) {
+      setSeed(seed);
+    }
+  }
+
+  // Backward compatibility: if testRandomFn is provided, use it via setTestRandom
   if (testConfig?.testRandomFn) {
+    const { setTestRandom } = require("./utils");
     setTestRandom(testConfig.testRandomFn);
   }
 
@@ -212,7 +258,6 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
   }
 
   // Preprocess commands (handles /nap, /dream)
-  // Note: /recall is handled above, so preprocessCommands won't see it
   const { messages: processedMessages, flags: commandFlags } = preprocessCommands(messages);
 
   // If command was intercepted (e.g., /nap), return early
@@ -254,14 +299,10 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
     adjustedEffort = effectiveEffort * curve;
   }
 
-  // Get band configuration (use original effort for band selection)
+  // Get band configuration
   const band = bandFor(effectiveEffort);
   const intent = classifyIntent(processedMessages);
   const microIntent = detectMicroIntent(lastUserMessage);
-
-  // Gate non-helpful antics for math/code
-  const allowDropout = intent === "general";
-  const allowNonSeq = intent === "general" && effectiveEffort < 90;
 
   // Select strategy using weighted random
   const strategy = pickWeighted<Strategy>(band.weights);
@@ -325,82 +366,37 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
     text = fallbackLine(strategy, intent, config);
   }
 
-  // Add wake reaction if keywords detected
-  if (config.ENABLE_WAKE_REACTIONS && hasWakeKeywords && !mergedFlags.dream) {
-    const reaction = WAKE_REACTIONS[Math.floor(testRandom() * WAKE_REACTIONS.length)];
-    text = reaction + " " + text;
-  }
+  // --- PIPELINE EXECUTION ---
 
-  // Self-referential humor (low probability)
-  if (
-    config.ALLOW_SELF_REFERENCES &&
-    testRandom() < config.SELF_REF_PROB &&
-    intent === "general" &&
-    !mergedFlags.dream
-  ) {
-    const fact = text.substring(0, Math.min(50, text.length));
-    text = renderSelfRef(fact, testRandom);
-  }
+  const context: PipelineContext = {
+    effort: effectiveEffort,
+    isDreaming: !!mergedFlags.dream,
+    isNapping: false, // Not used in current processors
+    intent,
+    config,
+    testConfig,
+    metadata: {
+      gaveUp: false,
+      nonSequitur: false,
+      strategy,
+    },
+    band,
+    history: processedMessages,
+  };
 
-  // Mid-reply dropout (never below min length)
-  let gaveUp = false;
-  const dropoutProb = config.ENABLE_LAZINESS_CURVE
-    ? band.dropout * (1 - lazinessCurve(effectiveEffort))
-    : band.dropout;
+  const processors: Processor[] = [
+    new WakeReactionProcessor(),
+    new SelfReferenceProcessor(),
+    new DropoutProcessor(),
+    new NonSequiturProcessor(),
+    new SleepySignOffProcessor(),
+    new DreamDriftProcessor(),
+    new EchoFragmentProcessor(),
+    new TruncationProcessor(),
+  ];
 
-  if (allowDropout && testRandom() < dropoutProb && text.length > 40) {
-    const truncated = safeTruncate(text, 40);
-    text = truncated + "… zzz";
-    gaveUp = true;
-  }
-
-  // Occasional non-sequitur (never for math/code)
-  let nonSequitur = false;
-  if (allowNonSeq && testRandom() < band.nonseq && !gaveUp) {
-    text += " Anyway… pancakes.";
-    nonSequitur = true;
-  }
-
-  // Sleepy sign-off on full-help high effort
-  if (strategy === "full-help" && effectiveEffort >= 86 && !gaveUp) {
-    text += " Ok, I'm going back to sleep now.";
-  }
-
-  // Dream Drift: append or blend whimsical fragment
-  if (!mergedFlags.dream && !gaveUp && intent === "general") {
-    const driftProb = testConfig.dreamDriftProb !== undefined ? testConfig.dreamDriftProb : config.DREAM_DRIFT_PROB;
-
-    if (testRandom() < driftProb) {
-      const fragment = DRIFT_FRAGMENTS[Math.floor(testRandom() * DRIFT_FRAGMENTS.length)];
-
-      if (config.ENABLE_DRIFT_BLEND && testRandom() < config.DRIFT_BLEND_RATIO) {
-        // Mid-sentence blend
-        const parts = splitOnPunctuation(text);
-        if (parts.length > 1) {
-          const insertIndex = Math.floor(testRandom() * (parts.length - 1)) + 1;
-          parts.splice(insertIndex, 0, fragment);
-          text = parts.join(" ");
-        } else {
-          // Fallback to append if no good split point
-          text += " " + fragment;
-        }
-      } else {
-        // Classic append
-        text += " " + fragment;
-      }
-    }
-  }
-
-  // Echo fragment (prior-turn reference)
-  if (
-    config.ENABLE_ECHO_FRAGMENTS &&
-    !isFirstTurn() &&
-    testRandom() < config.ECHO_FRAGMENT_PROB &&
-    intent === "general" &&
-    !gaveUp
-  ) {
-    const echo = ECHO_FRAGMENTS[Math.floor(testRandom() * ECHO_FRAGMENTS.length)];
-    text += " " + echo;
+  for (const processor of processors) {
+    text = processor.process(text, context);
   }
 
   // Update conversation state
@@ -408,7 +404,7 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
 
   // Reset test RNG
   if (testConfig.testRandomFn) {
-    setTestRandom(undefined);
+    setSeed(null);
   }
 
   return {
@@ -417,12 +413,12 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
       strategy,
       effort: effectiveEffort,
       intent,
-      gaveUp,
-      nonSequitur,
+      gaveUp: context.metadata.gaveUp,
+      nonSequitur: context.metadata.nonSequitur,
     },
     usage,
   };
 }
 
 // Export test utilities
-export { setTestRandom, resetConversationState };
+export { resetConversationState };

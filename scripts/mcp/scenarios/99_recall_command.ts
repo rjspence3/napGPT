@@ -18,7 +18,7 @@ export async function runRecallCommandTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Enable recall command via test config

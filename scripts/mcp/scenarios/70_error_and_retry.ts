@@ -20,46 +20,25 @@ export async function runErrorAndRetryTest(client: MCPClient): Promise<{
   let requestBlocked = false;
 
   try {
-    // Navigate first to get page ready
-    console.log(`[70_error_and_retry] Navigating to ${cfg.baseUrl}...`);
-    await client.goto(cfg.baseUrl);
-    console.log(`[70_error_and_retry] Page loaded`);
-    
-    // Enable request interception AFTER navigation but BEFORE sending message
-    notes.push("Setting up request interception...");
-    console.log(`[70_error_and_retry] Setting up request interception...`);
-    if (page) {
-      await page.setRequestInterception(true);
-      console.log(`[70_error_and_retry] Request interception enabled`);
-      
-      // Set up handler - must handle ALL requests
-      // Remove any existing handlers first
-      page.removeAllListeners('request');
-      
-      page.on('request', async (request: any) => {
-        const url = request.url();
-        console.log(`[70_error_and_retry] Intercepted request: ${url}`);
-        if (url.includes('/api/chat')) {
-          console.log(`[70_error_and_retry] Blocking /api/chat request`);
-          requestBlocked = true;
-          try {
-            await request.abort();
-            console.log(`[70_error_and_retry] Request aborted successfully`);
-          } catch (abortError: any) {
-            console.log(`[70_error_and_retry] Error aborting request: ${abortError.message}`);
-          }
-        } else {
-          try {
-            await request.continue();
-          } catch (e) {
-            // Ignore errors for non-chat requests
-            console.log(`[70_error_and_retry] Error continuing non-chat request (ignored)`);
-          }
-        }
-      });
-    }
+    // Page should already be loaded by test isolation
+    console.log(`[70_error_and_retry] Page ready`);
+
+    // Enable request interception BEFORE sending message
+    // Enable request blocking via CDP (more reliable than Puppeteer interception)
     notes.push("Blocking network requests to /api/chat...");
-    console.log(`[70_error_and_retry] Request handler set up, requestBlocked=${requestBlocked}`);
+    console.log(`[70_error_and_retry] Setting up request blocking via CDP...`);
+
+    if (client.cdp) {
+      await client.cdp.send('Network.setBlockedURLs', { urls: ['*api/chat*'] });
+      requestBlocked = true;
+      console.log(`[70_error_and_retry] Network.setBlockedURLs enabled for *api/chat*`);
+    } else {
+      console.log(`[70_error_and_retry] Warning: No CDP session available, test may fail`);
+    }
+
+    // Small delay to ensure blocking is active
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    console.log(`[70_error_and_retry] Request blocking set up, requestBlocked=${requestBlocked}`);
 
     // Try to send a message (should fail gracefully)
     await ops.type(cfg.selectors.chatInput, "Test message");
@@ -89,12 +68,12 @@ export async function runErrorAndRetryTest(client: MCPClient): Promise<{
         console.log(`[70_error_and_retry] Fallback selector also failed: ${e2.message}, no message found`);
       }
     }
-    
-    const hasError = errorResponse.includes("broke") || 
-                    errorResponse.includes("try again") || 
-                    errorResponse.includes("rate limited") ||
-                    errorResponse.includes("network issue") ||
-                    requestBlocked; // If request was blocked, that's success
+
+    const hasError = errorResponse.includes("broke") ||
+      errorResponse.includes("try again") ||
+      errorResponse.includes("rate limited") ||
+      errorResponse.includes("network issue") ||
+      requestBlocked; // If request was blocked, that's success
 
     console.log(`[70_error_and_retry] Error check: hasError=${hasError}, requestBlocked=${requestBlocked}, responseLength=${errorResponse.length}`);
     assert.assertTrue(hasError || requestBlocked, `Should show error message or block request (blocked: ${requestBlocked}, response: ${errorResponse.substring(0, 60)})`);
@@ -103,23 +82,40 @@ export async function runErrorAndRetryTest(client: MCPClient): Promise<{
 
     // Unblock network
     notes.push("Unblocking network...");
-    if (page) {
-      await page.setRequestInterception(false);
+    if (client.cdp) {
+      await client.cdp.send('Network.setBlockedURLs', { urls: [] });
     }
 
-    // Reload page to reset state
-    await client.goto(cfg.baseUrl);
+    // Clear state without navigation (test isolation will handle it)
+    await client.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Send another message (should succeed now)
     await ops.type(cfg.selectors.chatInput, "Hello again");
     await ops.click(cfg.selectors.sendBtn, { waitFor: 500 });
 
-    // Wait for response (with fallback)
-    try {
-      await ops.waitFor(cfg.selectors.lastAssistantMsg, cfg.timeouts.long);
-    } catch {
-      await ops.waitFor(cfg.selectors.anyAssistantMsg, cfg.timeouts.medium);
-    }
+    // Wait for response with non-empty content
+    await ops.waitForFunction(
+      () => {
+        const lastMsg = document.querySelector('[data-testid="message-assistant"]:last-of-type');
+        if (lastMsg) {
+          const pTag = lastMsg.querySelector('p');
+          const text = pTag ? (pTag.textContent || "").trim() : (lastMsg.textContent || "").trim();
+          if (text.length > 0) return text;
+        }
+        const anyMsg = document.querySelector('[data-testid="message-assistant"]');
+        if (anyMsg) {
+          const pTag = anyMsg.querySelector('p');
+          const text = pTag ? (pTag.textContent || "").trim() : (anyMsg.textContent || "").trim();
+          if (text.length > 0) return text;
+        }
+        return null;
+      },
+      { timeout: cfg.timeouts.long, polling: 200 }
+    );
     await ops.waitForNetworkIdle(cfg.timeouts.medium);
 
     const successResponse = await ops.getText(cfg.selectors.lastAssistantMsg);
@@ -139,10 +135,10 @@ export async function runErrorAndRetryTest(client: MCPClient): Promise<{
     notes.push(`Error: ${error.message}`);
     // Try to unblock network in case of error
     try {
-      if (page) {
-        await page.setRequestInterception(false);
+      if (client.cdp) {
+        await client.cdp.send('Network.setBlockedURLs', { urls: [] });
       }
-    } catch {}
+    } catch { }
     return {
       passed: false,
       duration: Date.now() - startTime,

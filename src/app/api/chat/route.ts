@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { respond } from "@/lib/nap/engine";
 import { preprocessCommands } from "@/lib/nap/utils";
+import { getTestRandom } from "@/lib/utils/testRandom";
+import { isTestMode } from "@/lib/utils/env";
 import type { LLMMessage } from "@/lib/llm/adapter";
 import { getLLMConfig } from "@/lib/llm/adapter";
+import type { TestConfigOverrides } from "@/lib/nap/config";
+import { getRateLimiter } from "@/lib/rate-limit";
 
 const requestSchema = z.object({
   messages: z.array(
@@ -38,34 +42,16 @@ const requestSchema = z.object({
     .optional(),
 });
 
-// Simple in-memory rate limit (for MVP)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const isTestMode = process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT_TEST === "true";
-const RATE_LIMIT = isTestMode ? 100 : 10; // Much higher for tests
+// Initialize rate limiter
+const RATE_LIMIT = isTestMode() ? 1000 : 10; // Much higher for tests
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const rateLimiter = getRateLimiter(RATE_LIMIT, RATE_LIMIT_WINDOW);
 
 function getRateLimitKey(request: NextRequest): string {
   // Try to get IP from headers
   const forwarded = request.headers.get("x-forwarded-for");
   const ip = forwarded ? forwarded.split(",")[0] : "unknown";
   return ip;
-}
-
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(key);
-
-  if (!record || now > record.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return true;
-  }
-
-  if (record.count >= RATE_LIMIT) {
-    return false;
-  }
-
-  record.count++;
-  return true;
 }
 
 // Simple cookie-based boost tracking (for MVP)
@@ -98,7 +84,7 @@ export async function POST(request: NextRequest) {
 
   // Chaos failure injection
   if (chaosFail > 0 || chaos429 > 0) {
-    const roll = Math.random() * 100;
+    const roll = getTestRandom() * 100;
     if (roll < chaosFail) {
       return NextResponse.json({ error: "llm_error" }, { status: 502 });
     }
@@ -130,7 +116,7 @@ export async function POST(request: NextRequest) {
   const { messages: rawMessages, effort, flags, testConfig: requestTestConfig } = parsed.data;
 
   // Merge request testConfig with env-based determinism controls
-  const testConfig: any = {
+  const testConfig: TestConfigOverrides = {
     ...requestTestConfig,
     ...(process.env.NAPGPT_DISABLE_DREAM_DRIFT === '1' && { dreamDriftProb: 0 }),
   };
@@ -155,88 +141,167 @@ export async function POST(request: NextRequest) {
 
   // Rate limiting
   const rateLimitKey = getRateLimitKey(request);
-  if (!checkRateLimit(rateLimitKey)) {
+  const limitResult = await rateLimiter.check(rateLimitKey);
+
+  if (!limitResult.success) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please slow down." },
-      { status: 429 }
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': String(limitResult.limit),
+          'X-RateLimit-Remaining': String(limitResult.remaining),
+          'X-RateLimit-Reset': String(limitResult.reset),
+        }
+      }
     );
   }
 
   // Get boost from cookie (but don't use it - effort comes from request)
   const wakeBoost = getBoostFromCookie(request);
 
-  // Retry logic with backoff
-  const maxAttempts = 3;
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const response = await respond({
-        messages,
-        effort, // Use effort from request, not cookie
-        wakeBoost,
-        flags: flags || {},
-        testConfig: testConfig,
-      });
+  // Hard timeout controller (8s cap)
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 8000);
 
-      // Hard fallback for empty responses
-      if (!response?.text || response.text.trim().length === 0) {
-        return NextResponse.json(
-          { reply: "idk, maybe just google it?", meta: { fallback: true, ...response.meta } },
-          { status: 200 }
-        );
+  try {
+    // Retry logic with backoff
+    const maxAttempts = 3;
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        // Check if aborted
+        if (ctrl.signal.aborted) {
+          throw new Error('Request timeout');
+        }
+
+        const response = await respond({
+          messages,
+          effort, // Use effort from request, not cookie
+          wakeBoost,
+          flags: flags || {},
+          testConfig: testConfig,
+        });
+
+        // Log response from engine for debugging (test mode only)
+        if (isTestMode()) {
+          const trace = {
+            start: Date.now(),
+            attempt: i + 1,
+            status: 200,
+            ms: Date.now(),
+            replyLen: response?.text?.length || 0,
+          };
+          console.log('[API] Response from engine:', {
+            ...trace,
+            hasText: !!response?.text,
+            textPreview: response?.text?.substring(0, 100) || '(empty)',
+            hasMeta: !!response?.meta,
+            meta: response?.meta,
+          });
+        }
+
+        // Normalize and ensure non-empty reply
+        let reply = (response?.text ?? "").trim();
+        if (!reply) {
+          console.warn('[API] Empty response from engine, using fallback', {
+            attempt: i + 1,
+            response: response,
+          });
+          reply = "… zzz (having a moment, try again)";
+        }
+        // Double-check: never return empty
+        if (!reply || reply.length === 0) {
+          reply = "… zzz (having a moment, try again)";
+        }
+
+        // Clear boost cookie after use (one-time use)
+        const llmConfig = getLLMConfig();
+        const usage = response?.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+        const responseObj = NextResponse.json({
+          reply,
+          meta: {
+            ...response?.meta,
+            model: llmConfig.model,
+            provider: llmConfig.provider,
+            usage,
+          },
+        }, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'X-RateLimit-Limit': String(limitResult.limit),
+            'X-RateLimit-Remaining': String(limitResult.remaining),
+            'X-RateLimit-Reset': String(limitResult.reset),
+          },
+        });
+
+        // Add provider/model/token headers for test verification
+        responseObj.headers.set('x-provider', llmConfig.provider);
+        responseObj.headers.set('x-model', llmConfig.model);
+        responseObj.headers.set('x-total-tokens', String(usage.totalTokens));
+
+        responseObj.cookies.delete("napgpt_boost");
+
+        clearTimeout(timeoutId);
+        return responseObj;
+      } catch (err: unknown) {
+        // Check if timeout
+        if (ctrl.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+          console.warn('[API] Request timeout, using fallback');
+          clearTimeout(timeoutId);
+          return NextResponse.json(
+            { reply: "… zzz (took too long, try again)", meta: { fallback: true, timeout: true } },
+            { status: 200 }
+          );
+        }
+
+        const status = (err as { status?: number })?.status ?? 500;
+
+        // Retry on 429 or 5xx errors
+        if ((status === 429 || status >= 500) && i < maxAttempts - 1) {
+          const backoff = 200 + getTestRandom() * 400;
+          await new Promise((resolve) => setTimeout(resolve, backoff));
+          continue;
+        }
+
+        // Non-retryable error
+        if (status === 429) {
+          clearTimeout(timeoutId);
+          return NextResponse.json(
+            { reply: "… zzz (rate limited, try again)", meta: { rateLimited: true } },
+            { status: 200 }
+          );
+        }
+
+        // Last attempt failed, use fallback
+        if (i === maxAttempts - 1) {
+          clearTimeout(timeoutId);
+          return NextResponse.json(
+            { reply: "… zzz (having a moment, try again)", meta: { fallback: true, error: true } },
+            { status: 200 }
+          );
+        }
       }
-
-      // Clear boost cookie after use (one-time use)
-      const llmConfig = getLLMConfig();
-      const usage = response.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-      
-      const responseObj = NextResponse.json({
-        reply: response.text,
-        meta: {
-          ...response.meta,
-          model: llmConfig.model,
-          provider: llmConfig.provider,
-          usage,
-        },
-      });
-
-      // Add provider/model/token headers for test verification
-      responseObj.headers.set('x-provider', llmConfig.provider);
-      responseObj.headers.set('x-model', llmConfig.model);
-      responseObj.headers.set('x-total-tokens', String(usage.totalTokens));
-
-      responseObj.cookies.delete("napgpt_boost");
-
-      return responseObj;
-    } catch (err: any) {
-      const status = err?.status ?? 500;
-
-      // Retry on 429 or 5xx errors
-      if ((status === 429 || status >= 500) && i < maxAttempts - 1) {
-        const backoff = 200 + Math.random() * 400;
-        await new Promise((resolve) => setTimeout(resolve, backoff));
-        continue;
-      }
-
-      // Non-retryable error
-      if (status === 429) {
-        return NextResponse.json(
-          { reply: "… zzz (rate limited, try again)", meta: { rateLimited: true } },
-          { status: 200 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: "llm_error" },
-        { status: 502 }
-      );
     }
-  }
 
-  // All retries exhausted
-  return NextResponse.json(
-    { reply: "… zzz (rate limited, try again)", meta: { rateLimited: true } },
-    { status: 200 }
-  );
+    // All retries exhausted (shouldn't reach here, but safety)
+    clearTimeout(timeoutId);
+    return NextResponse.json(
+      { reply: "… zzz (rate limited, try again)", meta: { rateLimited: true } },
+      { status: 200 }
+    );
+  } catch (error: unknown) {
+    clearTimeout(timeoutId);
+    if (isTestMode()) {
+      console.error('[API] Unhandled error in POST handler:', error);
+    }
+    // Final safety net - never return empty
+    return NextResponse.json(
+      { reply: "… zzz (having a moment, try again)", meta: { fallback: true } },
+      { status: 200 }
+    );
+  }
 }
 
 // Helper endpoint to set boost cookie
@@ -257,6 +322,9 @@ export async function PUT(request: NextRequest) {
 
     return response;
   } catch (error) {
+    if (isTestMode()) {
+      console.error('[API] PUT /api/chat error:', error);
+    }
     return NextResponse.json(
       { error: "Invalid request" },
       { status: 400 }
@@ -266,7 +334,7 @@ export async function PUT(request: NextRequest) {
 
 // Helper endpoint to clear rate limit (test mode only)
 export async function DELETE(request: NextRequest) {
-  if (!isTestMode) {
+  if (!isTestMode()) {
     return NextResponse.json(
       { error: "Not allowed" },
       { status: 403 }
@@ -275,7 +343,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     // Clear all rate limits (for test isolation)
-    rateLimitMap.clear();
+    await rateLimiter.clear();
     return NextResponse.json({ success: true, cleared: "all" });
   } catch (error) {
     return NextResponse.json(

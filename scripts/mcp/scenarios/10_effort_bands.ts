@@ -23,25 +23,57 @@ export async function runEffortBandsTest(client: MCPClient): Promise<{
   const results: Array<{ effort: number; length: number; text: string }> = [];
 
   try {
-    await client.goto(cfg.baseUrl);
-
+    // Page should already be loaded by test isolation
     for (const effort of EFFORT_LEVELS) {
       notes.push(`Testing effort level: ${effort}`);
 
-      // Set effort slider
+      // Set effort
       await ops.setSlider(cfg.selectors.effortSlider, effort);
-      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Verify effort was set
+      await ops.evaluate(() => {
+        return (window as any).__nap_store?.getState().effort;
+      });
 
       // Clear previous messages (refresh or clear input)
-      await ops.type(cfg.selectors.chatInput, TEST_MESSAGE);
-      await ops.click(cfg.selectors.sendBtn, { waitFor: 500 });
+      // Get current message count
+      const initialCount = await ops.evaluate(() => {
+        return document.querySelectorAll('[data-testid="message-assistant"]').length;
+      });
 
-      // Wait for response (with fallback)
-      try {
-        await ops.waitFor(cfg.selectors.lastAssistantMsg, cfg.timeouts.long);
-      } catch {
-        await ops.waitFor(cfg.selectors.anyAssistantMsg, cfg.timeouts.medium);
-      }
+      await ops.type(cfg.selectors.chatInput, TEST_MESSAGE);
+      // Send message
+      await ops.click(cfg.selectors.sendBtn);
+
+      // Wait for new message to appear
+      await ops.waitForFunction(
+        (count: number) => document.querySelectorAll('[data-testid="message-assistant"]').length > count,
+        { timeout: 10000 },
+        initialCount
+      );
+
+      // Wait for network to be idle before checking for messages
+      await ops.waitForNetworkIdle(cfg.timeouts.medium);
+
+      // Wait for response with non-empty content
+      await ops.waitForFunction(
+        () => {
+          const lastMsg = document.querySelector('[data-testid="message-assistant"]:last-of-type');
+          if (lastMsg) {
+            const pTag = lastMsg.querySelector('p');
+            const text = pTag ? (pTag.textContent || "").trim() : (lastMsg.textContent || "").trim();
+            if (text.length > 0) return text;
+          }
+          const anyMsg = document.querySelector('[data-testid="message-assistant"]');
+          if (anyMsg) {
+            const pTag = anyMsg.querySelector('p');
+            const text = pTag ? (pTag.textContent || "").trim() : (anyMsg.textContent || "").trim();
+            if (text.length > 0) return text;
+          }
+          return null;
+        },
+        { timeout: cfg.timeouts.long, polling: 200 }
+      );
       await ops.waitForNetworkIdle(cfg.timeouts.medium);
 
       // Get response

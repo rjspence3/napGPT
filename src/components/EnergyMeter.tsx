@@ -32,6 +32,7 @@ export function EnergyMeter() {
           aria-valuemin={0}
           aria-valuemax={100}
           role="progressbar"
+          aria-label={`Energy level: ${percentage}%`}
         />
       </div>
       <span className="text-xs text-cozy-dim font-medium w-8">{percentage}%</span>

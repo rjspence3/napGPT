@@ -8,6 +8,7 @@ export function EffortBar() {
   const effort = useNapStore((state) => state.effort);
   const setEffort = useNapStore((state) => state.setEffort);
   const boostCooldown = useNapStore((state) => state.boostCooldown);
+  const isBoostOnCooldown = useNapStore((state) => state.isBoostOnCooldown);
   const triggerBoost = useNapStore((state) => state.triggerBoost);
   const napTimerEnabled = useNapStore((state) => state.napTimerEnabled);
   const toggleNapTimer = useNapStore((state) => state.toggleNapTimer);
@@ -63,9 +64,9 @@ export function EffortBar() {
     setEffort(value);
   };
 
-  // Use boostCooldown directly for disabled check (immediate sync)
+  // Use isBoostOnCooldown() for authoritative disabled check (timestamp-based)
   // Keep displayCooldown for seconds display only
-  const boostDisabled = boostCooldown > 0;
+  const boostDisabled = isBoostOnCooldown();
   const boostSeconds = Math.ceil(displayCooldown / 1000);
 
   return (
@@ -75,6 +76,7 @@ export function EffortBar() {
           className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-cozy-dim text-cozy-latte rounded-lg text-sm shadow-lg z-50"
           role="alert"
           aria-live="polite"
+          data-testid="toast-boost-refused"
         >
           {toastMessage}
         </div>

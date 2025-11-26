@@ -20,7 +20,7 @@ export async function runWakeReactionsTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Test wake keyword detection

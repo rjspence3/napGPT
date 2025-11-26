@@ -41,7 +41,10 @@ export class OpenAIClient implements LLMAdapter {
 
       clearTimeout(timer);
 
-      const content = response.choices[0]?.message?.content?.trim() || "";
+      const content = (response.choices[0]?.message?.content ?? "").toString().trim();
+      // Normalize empty completions - never return empty
+      const text = content.length > 0 ? content : "idk… maybe later (nap)";
+      
       const usage = response.usage
         ? {
             promptTokens: response.usage.prompt_tokens,
@@ -51,7 +54,7 @@ export class OpenAIClient implements LLMAdapter {
         : undefined;
 
       return {
-        text: content,
+        text,
         usage,
       };
     } catch (error) {

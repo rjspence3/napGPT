@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type BlanketState = {
   blanketOn: boolean;
@@ -11,12 +12,13 @@ export type CoffeeState = {
   earnBean: () => void;
 };
 
-interface NapState extends BlanketState, CoffeeState {
+export interface NapState extends BlanketState, CoffeeState {
   effort: number;
   energy: number;
   idleSince: number | null;
   isNapping: boolean;
   boostCooldown: number;
+  boostCooldownUntil: number; // Timestamp when cooldown ends (for reliable state)
   napTimerEnabled: boolean;
   setEffort: (effort: number) => void;
   consumeEnergy: (amount: number) => void;
@@ -25,6 +27,7 @@ interface NapState extends BlanketState, CoffeeState {
   toggleNapTimer: () => void;
   setNapping: (napping: boolean) => void;
   updateIdle: () => void;
+  isBoostOnCooldown: () => boolean; // Computed selector
 }
 
 const ENERGY_MAX = 100;
@@ -35,110 +38,174 @@ const BOOST_COOLDOWN_MS = 10000; // 10 seconds
 const BEAN_MAX = parseInt(process.env.NEXT_PUBLIC_NAPGPT_BEAN_MAX || "10", 10);
 const BEAN_START = 3;
 
-export const useNapStore = create<NapState>((set, get) => ({
-  effort: 50,
-  energy: ENERGY_MAX,
-  idleSince: null,
-  isNapping: false,
-  boostCooldown: 0,
-  napTimerEnabled: false,
-  blanketOn: false,
-  beans: BEAN_START,
-
-  setEffort: (effort: number) => {
-    set({ effort: Math.max(0, Math.min(100, effort)) });
-  },
-
-  consumeEnergy: (amount: number = ENERGY_DRAIN_RATE) => {
-    set((state) => ({
-      energy: Math.max(0, state.energy - amount),
-    }));
-  },
-
-  refillEnergy: () => {
-    set((state) => {
-      if (state.energy < ENERGY_MAX) {
-        return {
-          energy: Math.min(ENERGY_MAX, state.energy + ENERGY_REFILL_RATE),
-        };
-      }
-      return state;
-    });
-  },
-
-  triggerBoost: () => {
-    const state = get();
-    if (state.boostCooldown > 0) return;
-
-    set({ boostCooldown: BOOST_COOLDOWN_MS });
-
-    // Decrement cooldown every 100ms
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, BOOST_COOLDOWN_MS - elapsed);
-      
-      if (remaining === 0) {
-        clearInterval(interval);
-        set({ boostCooldown: 0 });
-      } else {
-        set({ boostCooldown: remaining });
-      }
-    }, 100);
-  },
-
-  toggleNapTimer: () => {
-    set((state) => ({
-      napTimerEnabled: !state.napTimerEnabled,
-      isNapping: false,
+/**
+ * Zustand store for NapGPT application state
+ * 
+ * Manages:
+ * - Effort level (0-100) for response generation
+ * - Energy level (0-100) that drains on send, refills when idle
+ * - Boost cooldown (timestamp-based for reliability)
+ * - Idle tracking for nap timer and blanket overlay
+ * - Coffee bean economy for boost activation
+ * - Blanket overlay state
+ * 
+ * All state updates are synchronous and atomic.
+ * Persisted fields: beans, effort, energy.
+ */
+export const useNapStore = create<NapState>()(
+  persist(
+    (set, get) => ({
+      effort: 50,
+      energy: ENERGY_MAX,
       idleSince: null,
-    }));
-  },
+      isNapping: false,
+      boostCooldown: 0,
+      boostCooldownUntil: 0, // Timestamp when cooldown ends
+      napTimerEnabled: false,
+      blanketOn: false,
+      beans: BEAN_START,
 
-  setNapping: (napping: boolean) => {
-    set({ isNapping: napping });
-  },
+      /**
+       * Set effort level (0-100)
+       * Automatically clamped to valid range
+       */
+      setEffort: (effort: number) => {
+        set({ effort: Math.max(0, Math.min(100, effort)) });
+      },
 
-  updateIdle: () => {
-    const state = get();
-    if (!state.napTimerEnabled) {
-      set({ idleSince: null, isNapping: false });
-      return;
+      /**
+       * Consume energy (drains on message send)
+       * @param amount - Energy to drain (defaults to ENERGY_DRAIN_RATE)
+       */
+      consumeEnergy: (amount: number = ENERGY_DRAIN_RATE) => {
+        set((state) => ({
+          energy: Math.max(0, state.energy - amount),
+        }));
+      },
+
+      /**
+       * Refill energy gradually when idle
+       * Only refills if idle for at least 2 seconds
+       */
+      refillEnergy: () => {
+        set((state) => {
+          // Only refill when idle (no recent activity)
+          // Consider idle if no activity in last 2 seconds
+          const isIdle = state.idleSince !== null && (Date.now() - state.idleSince) > 2000;
+          if (state.energy < ENERGY_MAX && isIdle) {
+            return {
+              energy: Math.min(ENERGY_MAX, state.energy + ENERGY_REFILL_RATE),
+            };
+          }
+          return state;
+        });
+      },
+
+      /**
+       * Trigger boost (one-time use, adds 20 to effort for next message)
+       * Uses timestamp-based cooldown for reliability
+       * Requires coffee beans (checked in UI component)
+       */
+      triggerBoost: () => {
+        const state = get();
+        // Check if cooldown is still active using timestamp
+        if (state.boostCooldownUntil > Date.now()) return;
+
+        const now = Date.now();
+        const cooldownEnd = now + BOOST_COOLDOWN_MS;
+        set({
+          boostCooldown: BOOST_COOLDOWN_MS,
+          boostCooldownUntil: cooldownEnd
+        });
+
+        // Update display cooldown every 100ms (for UI countdown)
+        // NOTE: This interval is cleaned up when boostCooldown reaches 0
+        const interval = setInterval(() => {
+          const state = get();
+          const remaining = Math.max(0, state.boostCooldownUntil - Date.now());
+
+          if (remaining === 0) {
+            clearInterval(interval);
+            set({ boostCooldown: 0, boostCooldownUntil: 0 });
+          } else {
+            set({ boostCooldown: remaining });
+          }
+        }, 100);
+        // Store interval ID for manual cleanup if needed (future enhancement)
+      },
+
+      isBoostOnCooldown: () => {
+        const state = get();
+        return state.boostCooldownUntil > Date.now();
+      },
+
+      toggleNapTimer: () => {
+        set((state) => ({
+          napTimerEnabled: !state.napTimerEnabled,
+          isNapping: false,
+          idleSince: null,
+        }));
+      },
+
+      setNapping: (napping: boolean) => {
+        set({ isNapping: napping });
+      },
+
+      updateIdle: () => {
+        const state = get();
+        if (!state.napTimerEnabled) {
+          // Only update if state actually changes to avoid re-renders
+          if (state.idleSince !== null || state.isNapping) {
+            set({ idleSince: null, isNapping: false });
+          }
+          return;
+        }
+
+        const now = Date.now();
+        if (state.idleSince === null) {
+          set({ idleSince: now });
+          return;
+        }
+
+        const idleTime = now - state.idleSince;
+        if (idleTime > IDLE_THRESHOLD && !state.isNapping) {
+          set({ isNapping: true });
+        } else if (idleTime <= IDLE_THRESHOLD && state.isNapping) {
+          set({ isNapping: false });
+        }
+      },
+
+      toggleBlanket: () => {
+        set((state) => ({ blanketOn: !state.blanketOn }));
+      },
+
+      spendBean: () => {
+        const state = get();
+        if (state.beans <= 0) {
+          return false;
+        }
+        set({ beans: state.beans - 1 });
+        return true;
+      },
+
+      earnBean: () => {
+        set((state) => ({
+          beans: Math.min(BEAN_MAX, state.beans + 1),
+        }));
+      },
+    }),
+    {
+      name: 'nap-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        beans: state.beans,
+        effort: state.effort,
+        energy: state.energy,
+        // Don't persist ephemeral state like isNapping, cooldowns, etc.
+      }),
     }
-
-    const now = Date.now();
-    if (state.idleSince === null) {
-      set({ idleSince: now });
-      return;
-    }
-
-    const idleTime = now - state.idleSince;
-    if (idleTime > IDLE_THRESHOLD && !state.isNapping) {
-      set({ isNapping: true });
-    } else if (idleTime <= IDLE_THRESHOLD && state.isNapping) {
-      set({ isNapping: false });
-    }
-  },
-
-  toggleBlanket: () => {
-    set((state) => ({ blanketOn: !state.blanketOn }));
-  },
-
-  spendBean: () => {
-    const state = get();
-    if (state.beans <= 0) {
-      return false;
-    }
-    set({ beans: state.beans - 1 });
-    return true;
-  },
-
-  earnBean: () => {
-    set((state) => ({
-      beans: Math.min(BEAN_MAX, state.beans + 1),
-    }));
-  },
-}));
+  )
+);
 
 // Expose store for testing
 if (typeof window !== 'undefined') {

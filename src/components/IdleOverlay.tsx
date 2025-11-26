@@ -1,10 +1,11 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useNapStore } from "@/lib/nap/state";
 
 export function IdleOverlay() {
   const isNapping = useNapStore((state) => state.isNapping);
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <AnimatePresence>
@@ -14,7 +15,7 @@ export function IdleOverlay() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.3 }}
           data-testid="idle-overlay"
         >
           <motion.div
@@ -24,7 +25,7 @@ export function IdleOverlay() {
               opacity: [0.5, 1, 0.5],
             }}
             transition={{
-              duration: 2,
+              duration: shouldReduceMotion ? 0 : 2,
               repeat: Infinity,
               ease: "easeInOut",
             }}

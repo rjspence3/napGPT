@@ -89,11 +89,16 @@ async function main() {
       overallPassed = false;
     }
 
-    // 3. Run Jest tests (non-live)
-    // Note: Jest-puppeteer tries to start its own server, which conflicts with existing dev server
-    // Skip Jest tests in orchestration - run separately: npm run test:ui-all
-    console.log('📋 Skipping Jest tests (run separately: npm run test:ui-all)\n');
-    console.log('   Jest tests require their own server instance to avoid port conflicts.\n');
+    // 3. Run Jest tests (if live LLM enabled, run live tests; otherwise skip)
+    if (runLive && env.liveLLM) {
+      // Live LLM tests will be run in step 4
+      console.log('📋 Jest tests will run as part of Live LLM tests...\n');
+    } else {
+      // Note: Jest-puppeteer tries to start its own server, which conflicts with existing dev server
+      // Skip Jest tests in orchestration - run separately: npm run test:ui-all
+      console.log('📋 Skipping Jest tests (run separately: npm run test:ui-all)\n');
+      console.log('   Jest tests require their own server instance to avoid port conflicts.\n');
+    }
 
     // 4. Run Live LLM tests if requested
     if (runLive && env.liveLLM) {
@@ -240,7 +245,8 @@ async function runJestTests(env: any, artifactsDir: string, liveOnly: boolean): 
     const jestArgs = ['--runInBand'];
     
     if (liveOnly) {
-      jestArgs.push('tests/ui/chat.live.spec.ts');
+      // Run all Jest tests when live LLM is enabled (they'll use live LLM via API)
+      jestArgs.push('tests/ui');
     } else {
       jestArgs.push('tests/ui', '--testPathIgnorePatterns=chat.live.spec.ts');
     }

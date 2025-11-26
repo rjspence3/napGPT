@@ -18,8 +18,7 @@ export async function runCommandsDreamNapTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
-
+    // Page should already be loaded by test isolation
     // Test /dream command
     notes.push("Testing /dream command...");
     await ops.type(cfg.selectors.chatInput, "/dream");
@@ -51,7 +50,7 @@ export async function runCommandsDreamNapTest(client: MCPClient): Promise<{
     await ops.click(cfg.selectors.sendBtn, { waitFor: 500 });
 
     // Check for nap overlay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await ops.waitFor(cfg.selectors.napOverlay, 5000);
     const napOverlayVisible = await ops.isVisible(cfg.selectors.napOverlay);
     assert.assertTrue(napOverlayVisible, "/nap should show nap overlay");
     notes.push("✓ Nap overlay appeared");

@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { useNapStore } from "@/lib/nap/state";
 import { motion } from "framer-motion";
+import { retryFetch } from "@/lib/utils/retryFetch";
+import { isTestMode } from "@/lib/utils/env";
 
 interface Message {
   role: "user" | "assistant";
@@ -24,7 +26,7 @@ export function ChatWindow() {
   const napTimerEnabled = useNapStore((state) => state.napTimerEnabled);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   };
 
   useEffect(() => {
@@ -62,12 +64,12 @@ export function ChatWindow() {
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
-    
+
     // Snapshot state synchronously to avoid race condition
     // Zustand hook has getState method for synchronous access
-    const currentEffort = (useNapStore as any).getState?.()?.effort ?? effort;
+    const currentEffort = useNapStore.getState().effort;
     const dreamMode = userMessage === "/dream";
-    
+
     setInput("");
     updateIdle();
 
@@ -86,13 +88,13 @@ export function ChatWindow() {
     ];
     setMessages(newMessages);
     setIsLoading(true);
-    consumeEnergy(10);
 
     // Microtask: settle any pending setState on slider
     await Promise.resolve();
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    // Consume energy BEFORE fetch (right before, not after)
+    const currentEnergy = useNapStore.getState().energy;
+    consumeEnergy(Math.min(20, currentEnergy));
 
     try {
       // Get test config from window.__nap_test if available
@@ -100,26 +102,28 @@ export function ChatWindow() {
         ? { dreamDriftProb: (window as any).__nap_test.dreamDriftProb }
         : undefined;
 
-      console.log('[ChatWindow] Sending fetch request to /api/chat...');
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: newMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          effort: currentEffort, // Use snapshot, not reactive value
-          flags: {
-            dream: dreamMode,
-          },
-          ...(testConfig && { testConfig }),
-        }),
-        signal: controller.signal,
-      });
-      console.log('[ChatWindow] Fetch response received, status:', response.status);
+      const requestBody = {
+        messages: newMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        effort: currentEffort, // Use snapshot, not reactive value
+        flags: {
+          dream: dreamMode,
+        },
+        ...(testConfig && { testConfig }),
+      };
 
-      clearTimeout(timeoutId);
+      if (isTestMode()) {
+        console.log('[ChatWindow] Sending fetch request to /api/chat...');
+      }
+      const response = await retryFetch("/api/chat", requestBody, {
+        attempts: 3,
+        timeoutMs: 8000,
+      });
+      if (isTestMode()) {
+        console.log('[ChatWindow] Fetch response received, status:', response.status);
+      }
 
       if (!response.ok) {
         // Check for rate limit
@@ -130,17 +134,56 @@ export function ChatWindow() {
         throw new Error(`Failed to get response: ${response.status}`);
       }
 
-      const data = await response.json();
-      console.log('[ChatWindow] Received response:', data.reply?.substring(0, 50));
+      // Parse response with error handling
+      let data: { reply?: string; message?: string; meta?: unknown } = {};
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        if (isTestMode()) {
+          console.error('[ChatWindow] Failed to parse response JSON:', parseError);
+        }
+        data = {};
+      }
+
+      // Normalize server reply - try multiple field names and ensure non-empty
+      let reply = (data?.reply ?? data?.message ?? "").toString().trim();
+      if (!reply) {
+        reply = "… zzz (nothing came back)";
+      }
+
+      // Detailed API response logging for debugging
+      if (isTestMode()) {
+        console.log('[ChatWindow] API Response Details:', {
+          hasReply: !!data.reply,
+          replyLength: reply.length,
+          replyPreview: reply.substring(0, 100),
+          replyType: typeof reply,
+          status: response.status,
+          statusText: response.statusText,
+          headers: {
+            provider: response.headers.get('x-provider'),
+            model: response.headers.get('x-model'),
+            tokens: response.headers.get('x-total-tokens'),
+          },
+          meta: data.meta,
+        });
+      }
+
+      if (isTestMode()) {
+        console.log('[ChatWindow] Received response:', reply.substring(0, 100));
+      }
       setMessages([
         ...newMessages,
-        { role: "assistant", content: data.reply },
+        { role: "assistant", content: reply },
       ]);
-      console.log('[ChatWindow] Messages updated, count:', newMessages.length + 1);
+      if (isTestMode()) {
+        console.log('[ChatWindow] Messages updated, count:', newMessages.length + 1);
+      }
     } catch (error) {
-      clearTimeout(timeoutId);
-      console.error("Error:", error);
-      
+      if (isTestMode()) {
+        console.error("Error:", error);
+      }
+
       let errorMessage = "ugh... something broke. maybe try again later?";
       if (error instanceof Error) {
         if (error.name === "AbortError" || error.message.includes("aborted") || error.message.includes("Failed to fetch")) {
@@ -156,7 +199,7 @@ export function ChatWindow() {
           errorMessage = "ugh... took too long. maybe try again?";
         }
       }
-      
+
       setMessages([
         ...newMessages,
         {
@@ -164,10 +207,14 @@ export function ChatWindow() {
           content: errorMessage,
         },
       ]);
-      console.log('[ChatWindow] Error message added:', errorMessage);
+      if (isTestMode()) {
+        console.log('[ChatWindow] Error message added:', errorMessage);
+      }
     } finally {
       setIsLoading(false);
       updateIdle();
+      // Restore focus to input after send
+      inputRef.current?.focus();
     }
   };
 
@@ -197,7 +244,7 @@ export function ChatWindow() {
             <p className="text-cozy-dim/70 max-w-md">
               The AI that just... doesn&apos;t feel like it right now.
             </p>
-            <p className="text-sm text-cozy-dim/50 mt-4">
+            <p className="text-sm text-cozy-dim/70 mt-4">
               Try: <code className="bg-cozy-warm/50 px-2 py-1 rounded">/nap</code> or{" "}
               <code className="bg-cozy-warm/50 px-2 py-1 rounded">/dream</code>
             </p>

@@ -7,6 +7,7 @@ import { IdleOverlay } from "@/components/IdleOverlay";
 import { BlanketOverlay } from "@/components/BlanketOverlay";
 import { initBlanketAuto } from "@/lib/nap/blanket";
 import { initBeanTicker } from "@/lib/nap/coffee";
+import { isDevelopmentMode } from "@/lib/utils/env";
 import { useState, useEffect } from "react";
 
 export default function Home() {
@@ -16,7 +17,12 @@ export default function Home() {
     fetch("/api/mode")
       .then((res) => res.json())
       .then((data) => setIsMockMode(data.isMock))
-      .catch(() => setIsMockMode(false));
+      .catch((error) => {
+        if (isDevelopmentMode()) {
+          console.warn('[Home] Failed to fetch mode:', error);
+        }
+        setIsMockMode(false);
+      });
   }, []);
 
   useEffect(() => {

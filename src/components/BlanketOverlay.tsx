@@ -1,10 +1,11 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useNapStore } from "@/lib/nap/state";
 
 export function BlanketOverlay() {
   const blanketOn = useNapStore((state) => state.blanketOn);
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <AnimatePresence>
@@ -16,7 +17,7 @@ export function BlanketOverlay() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
         >
           <div
             className="absolute inset-0"

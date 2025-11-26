@@ -1,9 +1,10 @@
-export default {
+const config = {
   baseUrl: process.env.E2E_BASE_URL || "http://localhost:3000",
   timeouts: {
-    short: 3000,
-    medium: 8000,
-    long: 30000, // Increased for slow API responses
+    short: 5000,      // Increased from 3000
+    medium: 15000,    // Increased from 8000
+    long: 60000,      // Increased from 30000 for slow API responses
+    veryLong: 120000, // New: for very slow operations
     networkIdle: 5000,
   },
   selectors: {
@@ -21,6 +22,7 @@ export default {
     bannerMockMode: '[data-testid="mock-banner"]',
     blanketOverlay: '[data-testid="blanket-overlay"]',
     beansCount: '[data-testid="beans-count"]',
+    toastBoostRefused: '[data-testid="toast-boost-refused"]',
   },
   chrome: {
     headless: process.env.HEADFUL !== "1",
@@ -34,5 +36,7 @@ export default {
   },
   artifactsDir: "artifacts",
 };
+
+export default config;
 
 

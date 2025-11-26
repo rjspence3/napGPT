@@ -18,7 +18,7 @@ export async function runEchoFragmentsTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Enable echo fragments via test config

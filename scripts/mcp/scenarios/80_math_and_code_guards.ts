@@ -18,7 +18,7 @@ export async function runMathAndCodeGuardsTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
 
     // Test 1: Math question at low effort
     notes.push("Test 1: Math question at low effort (10)");

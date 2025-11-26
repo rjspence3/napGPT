@@ -71,7 +71,7 @@ export function MessageBubble({ content, isUser, isTyping, 'data-testid': dataTe
             : {}
         }
       >
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{(content ?? "").toString()}</p>
       </motion.div>
     </motion.div>
   );

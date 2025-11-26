@@ -30,8 +30,12 @@
     "test:ui:headless": "TS_NODE_TRANSPILE_ONLY=1 tsx scripts/ui-test/run-all.ts",
     "test:ui:headful": "HEADFUL=1 TS_NODE_TRANSPILE_ONLY=1 tsx scripts/ui-test/run-all.ts",
     "test:ui:live": "LIVE_LLM=1 TS_NODE_TRANSPILE_ONLY=1 tsx scripts/ui-test/run-all.ts --live",
+    "test:ui:live:all": "LIVE_LLM=1 TS_NODE_TRANSPILE_ONLY=1 tsx scripts/ui-test/run-all.ts --live",
+    "test:ui:live:jest": "LIVE_LLM=1 jest --runInBand tests/ui",
     "test:ui:mcp": "MCP_DRIVER=server TS_NODE_TRANSPILE_ONLY=1 tsx scripts/ui-test/run-all.ts",
     "test:ui:report": "tsx scripts/ui-test/report.ts",
+    "test:ui:budget-gate": "tsx scripts/ui-test/budget-gate.ts",
+    "test:ui:flake-guard": "tsx scripts/ui-test/flake-guard.ts",
     "test:ui-all": "jest --runInBand",
     "test:ui-all:headful": "HEADFUL=1 jest --runInBand",
     "test:ui-live": "LIVE_LLM=1 jest --runInBand tests/ui/chat.live.spec.ts",
@@ -45,6 +49,7 @@
     "test:guardrails": "tsx tests/utils/run-guardrails.ts"
   },
   "dependencies": {
+    "@vercel/kv": "^3.0.0",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.0",
     "lucide-react": "^0.344.0",

@@ -20,6 +20,7 @@ Comprehensive Playwright test suite that tests all UI components:
 - **Responsive Design**: Mobile, tablet, desktop viewports
 - **Error Handling**: API errors, empty messages
 - **State Persistence**: Effort level persistence
+- **Persistence Check**: Verifies beans/effort persist across reloads (`103_persistence_check`)
 
 ### 3. `api-button-tests.spec.ts` (Playwright)
 Comprehensive API integration tests for all button-triggered API calls:

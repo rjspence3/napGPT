@@ -14,6 +14,7 @@ export interface ArtifactCollector {
   startTracing(): Promise<void>;
   stopTracing(filepath: string): Promise<void>;
   saveMetrics(filepath: string, metrics: Record<string, any>): Promise<void>;
+  captureAssistantBubbleHTML(filepath: string): Promise<string | null>;
 }
 
 export function createArtifactCollector(page: Page, cdp: CDPSession): ArtifactCollector {
@@ -110,6 +111,28 @@ export function createArtifactCollector(page: Page, cdp: CDPSession): ArtifactCo
     async saveMetrics(filepath: string, metrics: Record<string, any>) {
       await fs.mkdir(path.dirname(filepath), { recursive: true });
       await fs.writeFile(filepath, JSON.stringify(metrics, null, 2));
+    },
+
+    async captureAssistantBubbleHTML(filepath: string): Promise<string | null> {
+      try {
+        const html = await page.evaluate(() => {
+          const lastMsg = document.querySelector('[data-testid="message-assistant"]:last-of-type');
+          if (lastMsg) {
+            return lastMsg.outerHTML;
+          }
+          const anyMsg = document.querySelector('[data-testid="message-assistant"]');
+          return anyMsg ? anyMsg.outerHTML : null;
+        });
+
+        if (html) {
+          await fs.mkdir(path.dirname(filepath), { recursive: true });
+          await fs.writeFile(filepath, html);
+        }
+        return html;
+      } catch (error) {
+        console.error('Failed to capture assistant bubble HTML:', error);
+        return null;
+      }
     },
   };
 }

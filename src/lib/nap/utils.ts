@@ -1,16 +1,18 @@
+import { getTestRandom } from "@/lib/utils/testRandom";
+
 export function maybeGiveUpMidway(text: string, probability: number = 0.15): string {
-  if (Math.random() > probability) return text;
+  if (getTestRandom() > probability) return text;
 
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
   if (sentences.length === 0) return text + "… zzz";
 
-  const cutoff = Math.floor(Math.random() * sentences.length) + 1;
+  const cutoff = Math.floor(getTestRandom() * sentences.length) + 1;
   const truncated = sentences.slice(0, cutoff).join(". ") + "… zzz";
   return truncated;
 }
 
 export function maybeAddNonSequitur(text: string, probability: number = 0.1): string {
-  if (Math.random() > probability) return text;
+  if (getTestRandom() > probability) return text;
 
   const nonSequiturs = [
     "anyway… pancakes.",
@@ -19,7 +21,7 @@ export function maybeAddNonSequitur(text: string, probability: number = 0.1): st
     "hmm, I think I left the oven on.",
   ];
 
-  const random = nonSequiturs[Math.floor(Math.random() * nonSequiturs.length)];
+  const random = nonSequiturs[Math.floor(getTestRandom() * nonSequiturs.length)];
   return text + " " + random;
 }
 
@@ -47,7 +49,7 @@ export type MicroIntent = "tech" | "existential" | "complaint" | "general";
 
 export function detectMicroIntent(message: string): MicroIntent {
   const lower = message.toLowerCase();
-  
+
   // Tech detection: programming, technical terms
   const techPatterns = [
     /\b(react|vue|angular|typescript|javascript|python|java|code|function|api|database|server|client|framework|library|npm|package|git|github|deploy|build|compile|debug|test|unit|integration)\b/,
@@ -56,7 +58,7 @@ export function detectMicroIntent(message: string): MicroIntent {
   if (techPatterns.some(pattern => pattern.test(lower))) {
     return "tech";
   }
-  
+
   // Existential detection: philosophical, life questions
   const existentialPatterns = [
     /\b(meaning|purpose|life|death|existence|why are we|what is the point|philosophy|existential)\b/,
@@ -65,7 +67,7 @@ export function detectMicroIntent(message: string): MicroIntent {
   if (existentialPatterns.some(pattern => pattern.test(lower))) {
     return "existential";
   }
-  
+
   // Complaint detection: frustration, problems, negative sentiment
   const complaintPatterns = [
     /\b(broken|doesn't work|not working|error|bug|problem|issue|frustrated|annoyed|hate|sucks|terrible|awful|worst|failed|failure)\b/,
@@ -74,7 +76,7 @@ export function detectMicroIntent(message: string): MicroIntent {
   if (complaintPatterns.some(pattern => pattern.test(lower))) {
     return "complaint";
   }
-  
+
   return "general";
 }
 
@@ -84,7 +86,7 @@ export function detectMicroIntent(message: string): MicroIntent {
  */
 export function summarizeReply(reply: string, maxLength: number = 80): string {
   if (reply.length <= maxLength) return reply;
-  
+
   // Try to cut at sentence boundary
   const sentences = reply.split(/[.!?]+/).filter(s => s.trim().length > 0);
   if (sentences.length > 0) {
@@ -101,7 +103,7 @@ export function summarizeReply(reply: string, maxLength: number = 80): string {
       return summary + (summary.endsWith(".") ? "" : ".");
     }
   }
-  
+
   // Fallback: truncate at word boundary
   const words = reply.split(/\s+/);
   let truncated = "";
@@ -119,11 +121,11 @@ export function splitOnPunctuation(text: string): string[] {
   // Split on sentence boundaries but keep punctuation
   const parts: string[] = [];
   let current = "";
-  
+
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     current += char;
-    
+
     // Check for sentence-ending punctuation followed by space or end
     if (/[.!?]/.test(char)) {
       const next = text[i + 1];
@@ -133,17 +135,18 @@ export function splitOnPunctuation(text: string): string[] {
       }
     }
   }
-  
+
   if (current.trim()) {
     parts.push(current.trim());
   }
-  
+
   return parts.filter(p => p.length > 0);
 }
 
 /**
  * Test RNG override support
- * Allows deterministic testing by overriding Math.random
+ * @deprecated Use getTestRandom from @/lib/utils/testRandom instead
+ * Kept for backward compatibility with engine.ts
  */
 let testRandomFn: (() => number) | null = null;
 
@@ -151,11 +154,16 @@ export function setTestRandom(fn?: () => number): void {
   testRandomFn = fn || null;
 }
 
+/**
+ * @deprecated Use getTestRandom from @/lib/utils/testRandom instead
+ * Re-exported for backward compatibility
+ */
 export function testRandom(): number {
   if (testRandomFn) {
     return testRandomFn();
   }
-  return Math.random();
+  // Fall back to seed-based RNG from utils/testRandom
+  return getTestRandom();
 }
 
 /**
@@ -228,3 +236,16 @@ export function preprocessCommands(
   return { messages, flags: {} };
 }
 
+
+/**
+ * Non-linear laziness curve
+ * Lower effort suppresses length sharply, high effort ramps quickly
+ * 
+ * @param effort - Effort level (0-100)
+ * @returns Normalized effort value (0-1) after applying S-curve transformation
+ */
+export function lazinessCurve(effort: number): number {
+  // S-curve: y = (effort/100)^1.7
+  const y = Math.pow(effort / 100, 1.7);
+  return Math.min(1, Math.max(0, y));
+}

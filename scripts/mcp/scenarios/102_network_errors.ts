@@ -19,7 +19,7 @@ export async function runNetworkErrorsTest(client: MCPClient): Promise<{
   const page = (client as any).page;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Test 1: Rate limiting (429) - send many requests quickly

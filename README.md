@@ -9,6 +9,7 @@ A cozy, intentionally-lazy AI chatbot built with Next.js 15, TypeScript, and Tai
 - 🎯 **Effort-based responses**: Adjust the effort slider (0-100) to control how helpful NapGPT is
 - ☕ **Boost button**: Temporarily increase effort for one reply (with cooldown)
 - ⚡ **Energy meter**: Visual indicator that drains during responses and refills over time
+- 💾 **Persistent State**: Beans, effort, and energy levels are saved across sessions
 - 😴 **Nap timer**: Auto-sleep overlay after 30 seconds of inactivity
 - 🛌 **Blanket mode**: Automatic cozy overlay when effort is low or idle for too long
 - 🎨 **Cozy UI**: Warm palette, rounded corners, soft shadows, gentle animations
@@ -20,6 +21,7 @@ A cozy, intentionally-lazy AI chatbot built with Next.js 15, TypeScript, and Tai
 ### Prerequisites
 
 - Node.js 18+ and pnpm (or npm/yarn)
+- (Optional) Redis database (Vercel KV) for production rate limiting
 
 ### Installation
 
@@ -101,7 +103,7 @@ See [tests/README.md](tests/README.md) for detailed testing documentation.
 
 ### Wake-Up Triggers
 
-- Click the **☕ Boost** button to temporarily increase effort by +20 for the next reply (10 second cooldown)
+- Click the **☕ Boost** button to temporarily increase effort for the next reply (10 second cooldown)
 - Type keywords like "motivate me", "urgent", "deadline", "important", "please help" to add +15 effort for one reply
 
 ### Nap Timer
@@ -155,6 +157,7 @@ napgpt/
         state.ts            # Zustand store
         utils.ts            # Helper functions
         blanket.ts          # Blanket mode auto-activation
+      rate-limit.ts         # Rate limiting logic (Redis/Memory)
   scripts/
     monitor.js              # Dev server health monitor
   tests/
@@ -175,6 +178,11 @@ napgpt/
 - `OPENAI_API_KEY` (optional): Your OpenAI API key. If not set, runs in mock mode.
 - `NAPGPT_MODEL` (optional): OpenAI model to use (default: `gpt-4-turbo-preview`)
 - `NAPGPT_MAX_TOKENS` (optional): Max tokens per response (default: `300`)
+
+**Rate Limiting (Production):**
+- `KV_URL` (optional): Redis connection URL (e.g., from Vercel KV)
+- `KV_REST_API_URL` (optional): Vercel KV REST API URL
+- `KV_REST_API_TOKEN` (optional): Vercel KV REST API Token
 
 **Feature Configuration:**
 - `NEXT_PUBLIC_NAPGPT_BLANKET_IDLE_MS` (optional): Idle time in ms before blanket activates (default: `30000`)

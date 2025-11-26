@@ -1,4 +1,5 @@
 import type { LLMAdapter, LLMMessage, LLMResponse, LLMOptions } from "./adapter";
+import { getTestRandom } from "../utils/testRandom";
 
 export class MockLLM implements LLMAdapter {
   private dreamResponses = [
@@ -20,7 +21,7 @@ export class MockLLM implements LLMAdapter {
     options: LLMOptions = {}
   ): Promise<LLMResponse> {
     // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 300 + Math.random() * 500));
+    await new Promise((resolve) => setTimeout(resolve, 300 + getTestRandom() * 500));
 
     const lastMessage = messages[messages.length - 1]?.content || "";
     const effort = options.effort || 50;
@@ -32,7 +33,7 @@ export class MockLLM implements LLMAdapter {
     if (dream) {
       text =
         this.dreamResponses[
-          Math.floor(Math.random() * this.dreamResponses.length)
+          Math.floor(getTestRandom() * this.dreamResponses.length)
         ];
     } else if (effort < 16) {
       text = "meh... too tired for that right now.";
@@ -41,7 +42,7 @@ export class MockLLM implements LLMAdapter {
     } else if (effort < 71) {
       text =
         this.normalResponses[
-          Math.floor(Math.random() * this.normalResponses.length)
+          Math.floor(getTestRandom() * this.normalResponses.length)
         ];
     } else if (effort < 86) {
       text = `fine... quick version: ${this.normalResponses[0]} But honestly, you should probably figure this out yourself.`;

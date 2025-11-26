@@ -26,7 +26,7 @@ export async function runDreamDriftTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Test 1: Force drift probability to 1.0 via window.__nap_test
@@ -73,11 +73,12 @@ export async function runDreamDriftTest(client: MCPClient): Promise<{
     });
     notes.push("Set dream drift probability to 0.0");
 
-    // Clear messages by reloading
+    // Clear messages by reloading page (clears non-persisted state)
     await client.goto(cfg.baseUrl);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     await ops.waitFor(cfg.selectors.chatInput, cfg.timeouts.short);
 
-    // Set probability again after reload
+    // Set probability again after clearing
     await ops.evaluate(() => {
       (window as any).__nap_test = { dreamDriftProb: 0.0 };
     });

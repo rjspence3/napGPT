@@ -18,8 +18,7 @@ export async function runIdleAndOverlayTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
-
+    // Page should already be loaded by test isolation
     // Enable nap timer
     const napToggleVisible = await ops.isVisible(cfg.selectors.napToggle);
     assert.assertTrue(napToggleVisible, "Nap toggle should be visible");
@@ -53,6 +52,10 @@ export async function runIdleAndOverlayTest(client: MCPClient): Promise<{
     // Save artifacts
     const artifactDir = `artifacts/${Date.now()}/30_idle_and_overlay`;
     await artifacts.screenshot(`${artifactDir}/screenshot.png`);
+
+    // Disable nap timer to clean up state
+    await ops.click(cfg.selectors.napToggle, { waitFor: 300 });
+    notes.push("Nap timer disabled (cleanup)");
 
     return {
       passed: true,

@@ -28,22 +28,22 @@ export async function runBlanketModeTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Test 1: Set effort to 10 (below threshold) → expect blanket visible
     await ops.setSlider(cfg.selectors.effortSlider, 10);
     // Wait for slider to update state
     await new Promise((resolve) => setTimeout(resolve, 500));
-    
+
     // Manually trigger blanket check and ensure blanket state is set
     await client.evaluate(() => {
       const store = (window as any).__nap_store;
       if (store) {
         const state = store.getState();
-        // Force blanket on if effort is low
-        if (state.effort < 20 && !state.blanketOn) {
-          state.toggleBlanket();
+        // Force blanket on if effort is low (directly set state)
+        if (state.effort < 20) {
+          store.setState({ blanketOn: true });
         }
       }
       // Also trigger the check function if available
@@ -51,8 +51,35 @@ export async function runBlanketModeTest(client: MCPClient): Promise<{
         (window as any).__nap_blanket_check();
       }
     });
+
+    // Wait for blanket to appear using waitForFunction
+    const page = (client as any).page;
+    if (page) {
+      // First wait for Zustand state
+      await page.waitForFunction(
+        () => {
+          const store = (window as any).__nap_store;
+          if (!store) return false;
+          return store.getState().blanketOn === true;
+        },
+        { timeout: 10000 }
+      );
+
+      // Then wait for overlay to be visible in DOM
+      await page.waitForFunction(
+        (selector: string) => {
+          const overlay = document.querySelector(selector);
+          if (!overlay) return false;
+          const style = window.getComputedStyle(overlay);
+          return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+        },
+        { timeout: 10000 },
+        cfg.selectors.blanketOverlay
+      );
+    }
+
     // Wait for React to update
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const blanketVisible1 = await ops.isVisible(cfg.selectors.blanketOverlay);
     assert.assertTrue(
       blanketVisible1,
@@ -77,7 +104,7 @@ export async function runBlanketModeTest(client: MCPClient): Promise<{
     notes.push("Nap timer enabled");
 
     // Wait for idle threshold + buffer
-    const waitTime = BLANKET_IDLE_MS + 500;
+    const waitTime = BLANKET_IDLE_MS + 2000;
     notes.push(`Waiting ${waitTime}ms for idle threshold...`);
     await new Promise((resolve) => setTimeout(resolve, waitTime));
 

@@ -20,8 +20,22 @@ export async function runEnergyMeterTest(client: MCPClient): Promise<{
   const energyReadings: number[] = [];
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
 
+    // Reset state to ensure test isolation
+    await client.evaluate(() => {
+      const store = (window as any).__nap_store;
+      if (store) {
+        store.setState({
+          energy: 100,
+          napTimerEnabled: false,
+          isNapping: false,
+          idleSince: null,
+          beans: 10 // Ensure enough beans just in case
+        });
+      }
+    });
+    notes.push("State reset: energy=100, napTimer=false");
     // Get initial energy level
     const initialEnergyAttr = await ops.getAttribute(cfg.selectors.energyMeterBar, "aria-valuenow");
     const initialEnergy = initialEnergyAttr ? parseInt(initialEnergyAttr, 10) : 100;
@@ -31,19 +45,23 @@ export async function runEnergyMeterTest(client: MCPClient): Promise<{
     // Send 3 quick messages to drain energy
     for (let i = 0; i < 3; i++) {
       await ops.type(cfg.selectors.chatInput, `Test message ${i + 1}`);
-      
-      // Read energy BEFORE sending (to get baseline)
-      const energyBeforeAttr = await ops.getAttribute(cfg.selectors.energyMeterBar, "aria-valuenow");
-      const energyBefore = energyBeforeAttr ? parseInt(energyBeforeAttr, 10) : initialEnergy;
-      
+
+      // Read energy from Zustand store directly (more reliable)
+      const energyBefore = await client.evaluate(() => {
+        const store = (window as any).__nap_store;
+        return store ? store.getState().energy : 100;
+      });
+
       await ops.click(cfg.selectors.sendBtn, { waitFor: 100 });
-      
+
       // Read energy IMMEDIATELY after clicking (before refill happens)
-      // Energy refills every 100ms, so we need to check quickly
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      const energyAfterAttr = await ops.getAttribute(cfg.selectors.energyMeterBar, "aria-valuenow");
-      const energyAfter = energyAfterAttr ? parseInt(energyAfterAttr, 10) : energyBefore;
-      
+      // Read from Zustand store directly for accuracy
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const energyAfter = await client.evaluate(() => {
+        const store = (window as any).__nap_store;
+        return store ? store.getState().energy : 100;
+      });
+
       // Energy should have decreased immediately after clicking
       if (i === 0) {
         // First message: should decrease from 100
@@ -60,7 +78,7 @@ export async function runEnergyMeterTest(client: MCPClient): Promise<{
           `Energy should decrease after message ${i + 1} (was ${energyReadings[energyReadings.length - 1]}%, now ${energyAfter}%)`
         );
       }
-      
+
       energyReadings.push(energyAfter);
       notes.push(`After message ${i + 1}: ${energyAfter}% (was ${energyBefore}%)`);
 

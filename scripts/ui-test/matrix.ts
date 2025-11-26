@@ -30,6 +30,7 @@ import { runRecallCommandTest } from '../mcp/scenarios/99_recall_command';
 import { runUiInteractionsTest } from '../mcp/scenarios/100_ui_interactions';
 import { runEdgeCasesTest } from '../mcp/scenarios/101_edge_cases';
 import { runNetworkErrorsTest } from '../mcp/scenarios/102_network_errors';
+import { runPersistenceCheck } from '../mcp/scenarios/persistence_check';
 
 const SCENARIOS = [
   { name: '00_smoke', fn: runSmokeTest, description: 'Smoke test: Basic page load and message sending' },
@@ -53,6 +54,7 @@ const SCENARIOS = [
   { name: '100_ui_interactions', fn: runUiInteractionsTest, description: 'UI interactions: keyboard, focus, scroll, alignment' },
   { name: '101_edge_cases', fn: runEdgeCasesTest, description: 'Edge cases: boundaries, empty inputs, long messages' },
   { name: '102_network_errors', fn: runNetworkErrorsTest, description: 'Network error scenarios: rate limits, timeouts, 500s' },
+  { name: '103_persistence_check', fn: runPersistenceCheck, description: 'Persistence: State saved across reloads' },
 ];
 
 /**
@@ -66,6 +68,10 @@ export async function runMCPScenarios(env: TestEnv, artifactsDir: string): Promi
     // Create MCP client
     client = await createMCPClient(env.baseUrl, !env.headful);
 
+    // Navigate to base URL on first test
+    await client.goto(env.baseUrl);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Run each scenario
     for (let i = 0; i < SCENARIOS.length; i++) {
       const scenario = SCENARIOS[i];
@@ -73,23 +79,70 @@ export async function runMCPScenarios(env: TestEnv, artifactsDir: string): Promi
       const startTime = start; // Alias for logging
 
       // Reset app state between scenarios
-      // Avoid navigation/reload to prevent frame detachment
+      // Check frame validity and recreate if needed
       try {
-        // Clear localStorage and sessionStorage without navigating
+        // Check if page is still valid
+        if (client.page) {
+          try {
+            await client.page.evaluate(() => document.readyState);
+          } catch (frameError: any) {
+            // Frame is detached, recreate client
+            console.log(`     [${Date.now() - startTime}ms] Frame detached, recreating client...`);
+            if (client.close) await client.close().catch(() => { });
+            client = await createMCPClient(env.baseUrl, !env.headful);
+            await client.goto(env.baseUrl);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        // Ensure we're on the correct URL (check without navigating if already there)
+        if (client.page) {
+          const currentUrl = await client.page.url();
+          if (currentUrl !== env.baseUrl && !currentUrl.includes(env.baseUrl)) {
+            // Only navigate if we're on a different URL
+            await client.goto(env.baseUrl);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        // Clear localStorage, sessionStorage, and Zustand store
         await client.evaluate(() => {
+          const store = (window as any).__nap_store;
+          if (store) {
+            store.setState({
+              effort: 50,
+              energy: 100,
+              idleSince: null,
+              isNapping: false,
+              boostCooldown: 0,
+              boostCooldownUntil: 0,
+              napTimerEnabled: false,
+              blanketOn: false,
+              beans: 3
+            });
+          }
           localStorage.clear();
           sessionStorage.clear();
         });
+
+        // Clear server-side rate limits
+        await client.evaluate(async () => {
+          await fetch('/api/chat', { method: 'DELETE' }).catch(() => { });
+        });
+
         // Wait for app to be ready
         await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (resetError) {
-        // If reset fails, only navigate as last resort (will cause frame detachment)
-        // But this should rarely happen
+      } catch (resetError: any) {
+        // If reset fails, recreate client and navigate
+        console.log(`     [${Date.now() - startTime}ms] Reset failed: ${resetError.message}, recreating client...`);
         try {
+          if (client.close) await client.close().catch(() => { });
+          client = await createMCPClient(env.baseUrl, !env.headful);
           await client.goto(env.baseUrl);
           await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (navError) {
-          // Ignore navigation errors, continue with test
+          // If navigation also fails, log and continue (test will likely fail)
+          console.log(`     [${Date.now() - startTime}ms] Navigation failed: ${navError}`);
         }
       }
 
@@ -98,29 +151,29 @@ export async function runMCPScenarios(env: TestEnv, artifactsDir: string): Promi
         const duration = Date.now() - start;
 
         // Capture failure screenshot
-      if (!result.passed) {
-        console.log(`     [${Date.now() - startTime}ms] Test failed, capturing screenshot...`);
-        try {
-          const failureDir = path.join(artifactsDir, 'failures');
-          await require('fs/promises').mkdir(failureDir, { recursive: true });
-          const screenshotPath = path.join(failureDir, `${scenario.name}.png`);
-          if (client.page) {
-            await client.page.screenshot({ path: screenshotPath, fullPage: true });
-            console.log(`     [${Date.now() - startTime}ms] Screenshot saved: ${screenshotPath}`);
+        if (!result.passed) {
+          console.log(`     [${Date.now() - startTime}ms] Test failed, capturing screenshot...`);
+          try {
+            const failureDir = path.join(artifactsDir, 'failures');
+            await require('fs/promises').mkdir(failureDir, { recursive: true });
+            const screenshotPath = path.join(failureDir, `${scenario.name}.png`);
+            if (client.page) {
+              await client.page.screenshot({ path: screenshotPath as any, fullPage: true });
+              console.log(`     [${Date.now() - startTime}ms] Screenshot saved: ${screenshotPath}`);
+            }
+          } catch (screenshotError) {
+            console.log(`     [${Date.now() - startTime}ms] Failed to capture screenshot: ${screenshotError}`);
           }
-        } catch (screenshotError) {
-          console.log(`     [${Date.now() - startTime}ms] Failed to capture screenshot: ${screenshotError}`);
         }
-      }
-      
-      // Log notes with timestamps
-      if (result.notes && result.notes.length > 0) {
-        console.log(`     Notes:`);
-        result.notes.forEach((note, idx) => {
-          const elapsed = idx === 0 ? Date.now() - startTime : '...';
-          console.log(`       [${elapsed}ms] ${note}`);
-        });
-      }
+
+        // Log notes with timestamps
+        if (result.notes && result.notes.length > 0) {
+          console.log(`     Notes:`);
+          result.notes.forEach((note, idx) => {
+            const elapsed = idx === 0 ? Date.now() - startTime : '...';
+            console.log(`       [${elapsed}ms] ${note}`);
+          });
+        }
 
         results.push({
           name: scenario.name,

@@ -18,7 +18,7 @@ export async function runContextThreadingTest(client: MCPClient): Promise<{
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
 
     // First message
     notes.push("Sending first message...");

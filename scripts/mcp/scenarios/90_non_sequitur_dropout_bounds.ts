@@ -18,7 +18,7 @@ export async function runNonSequiturDropoutBoundsTest(client: MCPClient): Promis
   const cfg = config;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
 
     const efforts = [25, 65];
     const longPrompts = [

@@ -19,7 +19,7 @@ export async function runUiInteractionsTest(client: MCPClient): Promise<{
   const page = (client as any).page;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Test 1: Keyboard shortcut - Enter to send
@@ -44,31 +44,35 @@ export async function runUiInteractionsTest(client: MCPClient): Promise<{
 
     // Test 2: Message alignment - user messages right, assistant left
     notes.push("Testing message alignment...");
+    await new Promise((resolve) => setTimeout(resolve, 500)); // Wait for messages to render
     const alignment = await page.evaluate(() => {
       const userMsg = document.querySelector('[data-testid="message-user"]');
       const assistantMsg = document.querySelector('[data-testid="message-assistant"]');
       
       if (!userMsg || !assistantMsg) return null;
       
-      const userParent = userMsg.parentElement;
-      const assistantParent = assistantMsg.parentElement;
+      // Check the MessageBubble element itself (it has the justify classes)
+      const userHasJustifyEnd = userMsg.classList.contains("justify-end") || 
+                                 window.getComputedStyle(userMsg).justifyContent === "flex-end";
+      const assistantHasJustifyStart = assistantMsg.classList.contains("justify-start") ||
+                                      window.getComputedStyle(assistantMsg).justifyContent === "flex-start";
       
       return {
-        userHasJustifyEnd: userParent?.classList.contains("justify-end") || 
-                          window.getComputedStyle(userParent || userMsg).justifyContent === "flex-end",
-        assistantHasJustifyStart: assistantParent?.classList.contains("justify-start") ||
-                                 window.getComputedStyle(assistantParent || assistantMsg).justifyContent === "flex-start",
+        userHasJustifyEnd,
+        assistantHasJustifyStart,
+        userClasses: userMsg.className,
+        assistantClasses: assistantMsg.className,
       };
     });
 
     if (alignment) {
       assert.assertTrue(
         alignment.userHasJustifyEnd,
-        "User messages should be right-aligned (justify-end)"
+        `User messages should be right-aligned (classes: ${alignment.userClasses})`
       );
       assert.assertTrue(
         alignment.assistantHasJustifyStart,
-        "Assistant messages should be left-aligned (justify-start)"
+        `Assistant messages should be left-aligned (classes: ${alignment.assistantClasses})`
       );
       notes.push("✓ Message alignment correct");
     } else {
@@ -80,15 +84,23 @@ export async function runUiInteractionsTest(client: MCPClient): Promise<{
     await ops.type(cfg.selectors.chatInput, "Another test");
     await ops.click(cfg.selectors.sendBtn, { waitFor: 500 });
     
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Wait for response and then check focus
+    try {
+      await ops.waitFor(cfg.selectors.lastAssistantMsg, cfg.timeouts.long);
+    } catch {
+      await ops.waitFor(cfg.selectors.anyAssistantMsg, cfg.timeouts.medium);
+    }
+    await ops.waitForNetworkIdle(cfg.timeouts.medium);
+    await new Promise((resolve) => setTimeout(resolve, 500)); // Allow focus to restore
     
     const isFocused = await page.evaluate((selector) => {
-      const input = document.querySelector(selector);
+      const input = document.querySelector(selector) as HTMLInputElement;
       return input === document.activeElement;
     }, cfg.selectors.chatInput);
 
-    // Focus may or may not be maintained (depends on implementation)
+    // Focus should be restored after send (we added this in ChatWindow)
     notes.push(`Input focused after send: ${isFocused}`);
+    // Don't assert - just log for now, as focus restoration might be timing-dependent
 
     // Test 4: Scroll behavior - should scroll to bottom
     notes.push("Testing scroll behavior...");

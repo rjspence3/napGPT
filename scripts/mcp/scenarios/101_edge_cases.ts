@@ -19,12 +19,12 @@ export async function runEdgeCasesTest(client: MCPClient): Promise<{
   const page = (client as any).page;
 
   try {
-    await client.goto(cfg.baseUrl);
+    // Page should already be loaded by test isolation
     notes.push("Page loaded");
 
     // Test 1: Effort boundaries (0 and 100)
     notes.push("Testing effort boundaries...");
-    
+
     // Test effort = 0
     await ops.setSlider(cfg.selectors.effortSlider, 0);
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -65,13 +65,14 @@ export async function runEdgeCasesTest(client: MCPClient): Promise<{
     notes.push("Testing very long message...");
     const longMessage = "A".repeat(1000);
     await ops.type(cfg.selectors.chatInput, longMessage);
-    await ops.click(cfg.selectors.sendBtn, { waitFor: 500 });
+    const initialCountLong = await page.evaluate(() => document.querySelectorAll('[data-testid="message-assistant"]').length);
+    await ops.click(cfg.selectors.sendBtn);
 
-    try {
-      await ops.waitFor(cfg.selectors.lastAssistantMsg, cfg.timeouts.long);
-    } catch {
-      await ops.waitFor(cfg.selectors.anyAssistantMsg, cfg.timeouts.medium);
-    }
+    await ops.waitForFunction(
+      (count: number) => document.querySelectorAll('[data-testid="message-assistant"]').length > count,
+      { timeout: cfg.timeouts.long },
+      initialCountLong
+    );
     await ops.waitForNetworkIdle(cfg.timeouts.medium);
 
     const longResponse = await ops.getText(cfg.selectors.lastAssistantMsg);
@@ -81,13 +82,14 @@ export async function runEdgeCasesTest(client: MCPClient): Promise<{
     // Test 4: Special characters
     notes.push("Testing special characters...");
     await ops.type(cfg.selectors.chatInput, "Hello! 🎉 Test with émojis & symbols: @#$%");
-    await ops.click(cfg.selectors.sendBtn, { waitFor: 500 });
+    const initialCountSpecial = await page.evaluate(() => document.querySelectorAll('[data-testid="message-assistant"]').length);
+    await ops.click(cfg.selectors.sendBtn);
 
-    try {
-      await ops.waitFor(cfg.selectors.lastAssistantMsg, cfg.timeouts.long);
-    } catch {
-      await ops.waitFor(cfg.selectors.anyAssistantMsg, cfg.timeouts.medium);
-    }
+    await ops.waitForFunction(
+      (count: number) => document.querySelectorAll('[data-testid="message-assistant"]').length > count,
+      { timeout: cfg.timeouts.long },
+      initialCountSpecial
+    );
     await ops.waitForNetworkIdle(cfg.timeouts.medium);
 
     const specialResponse = await ops.getText(cfg.selectors.lastAssistantMsg);
@@ -97,19 +99,19 @@ export async function runEdgeCasesTest(client: MCPClient): Promise<{
     // Test 5: Multiple rapid clicks (spam protection)
     notes.push("Testing rapid clicks protection...");
     await ops.type(cfg.selectors.chatInput, "Rapid test");
-    
+
     // Click multiple times rapidly
     for (let i = 0; i < 3; i++) {
       await ops.click(cfg.selectors.sendBtn, { waitFor: 50 });
     }
-    
+
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Should only have one response (or handle gracefully)
     const messageCount = await page.evaluate(() => {
       return document.querySelectorAll('[data-testid="message-assistant"]').length;
     });
-    
+
     assert.assertTrue(
       messageCount >= 1,
       `Should have at least one response after rapid clicks (got ${messageCount})`
