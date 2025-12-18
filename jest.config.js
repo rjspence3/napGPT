@@ -1,7 +1,6 @@
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'jest-puppeteer',
-  testEnvironment: 'node',
   testMatch: process.env.JEST_FAILPACK
     ? ['**/tests/ui/failpack/**/*.spec.ts']
     : process.env.LIVE_LLM === '1'
@@ -11,7 +10,14 @@ module.exports = {
   testTimeout: 30000,
   maxWorkers: 1, // Run tests serially for stability
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', { isolatedModules: true }],
+    '^.+\\.tsx?$': ['ts-jest', {
+      useESM: false,
+      tsconfig: {
+        module: 'commonjs',
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    }],
   },
   globals: {
     UI_ARTIFACT_DIR: process.env.UI_ARTIFACT_DIR || 'artifacts/ui-test',
