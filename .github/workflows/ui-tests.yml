@@ -48,7 +48,7 @@ jobs:
       - name: Run UI tests
         run: |
           if [ "${{ matrix.mode }}" == "headful" ] && [ "${{ runner.os }}" == "Linux" ]; then
-            xvfb-run --auto-servernum HEADFUL=1 npm run test:ui-all
+            HEADFUL=1 xvfb-run --auto-servernum npm run test:ui-all
           elif [ "${{ matrix.mode }}" == "headful" ]; then
             HEADFUL=1 npm run test:ui-all
           else
@@ -63,7 +63,7 @@ jobs:
         if: ${{ env.HAS_LIVE_LLM != '' }}
         run: |
           if [ "${{ matrix.mode }}" == "headful" ] && [ "${{ runner.os }}" == "Linux" ]; then
-            xvfb-run --auto-servernum HEADFUL=1 npm run test:ui-live
+            HEADFUL=1 xvfb-run --auto-servernum npm run test:ui-live
           elif [ "${{ matrix.mode }}" == "headful" ]; then
             HEADFUL=1 npm run test:ui-live
           else
