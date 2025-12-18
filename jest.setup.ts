@@ -5,7 +5,6 @@
 import { toMatchImageSnapshot } from 'jest-image-snapshot';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { installFakeTimers, uninstallFakeTimers } from './tests/utils/clock';
 import { initRng, resetRng } from './tests/utils/rng';
 
 // Extend Jest matchers
@@ -27,17 +26,13 @@ async function ensureArtifactDirs() {
 beforeAll(async () => {
   await ensureArtifactDirs();
 
-  // Initialize fake timers for deterministic tests
-  installFakeTimers(Date.now());
-
-  // Initialize seeded RNG
+  // Initialize seeded RNG for deterministic tests
   const seed = process.env.TEST_SEED ? parseInt(process.env.TEST_SEED, 10) : 12345;
   initRng(seed);
 });
 
 // Cleanup after all tests
 afterAll(async () => {
-  uninstallFakeTimers();
   resetRng();
 });
 

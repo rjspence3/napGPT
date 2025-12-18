@@ -11,6 +11,9 @@ const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3000';
 describe('Overlay States', () => {
   let page: Page;
 
+  // Extend timeout for overlay tests with animations and waits
+  jest.setTimeout(60000);
+
   beforeAll(async () => {
     page = (global as any).page;
     await page.setViewport({ width: 1280, height: 720 });

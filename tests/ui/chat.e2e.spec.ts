@@ -14,6 +14,9 @@ const LLM_BASE_URL = process.env.LLM_BASE_URL || 'http://localhost:3001';
 describe('Chat E2E - Network Verification', () => {
   let page: Page;
 
+  // Extend timeout for e2e tests with multiple network round-trips
+  jest.setTimeout(60000);
+
   beforeAll(async () => {
     page = (global as any).page;
     await page.setViewport({ width: 1280, height: 720 });
