@@ -2,11 +2,11 @@
  * Jest setup: extend expect, register image snapshot, configure global artifact dir, console gate
  */
 
-const { toMatchImageSnapshot } = require('jest-image-snapshot');
-const fs = require('fs/promises');
-const path = require('path');
-const { installFakeTimers, uninstallFakeTimers } = require('./tests/utils/clock');
-const { initRng, resetRng } = require('./tests/utils/rng');
+import { toMatchImageSnapshot } from 'jest-image-snapshot';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { installFakeTimers, uninstallFakeTimers } from './tests/utils/clock';
+import { initRng, resetRng } from './tests/utils/rng';
 
 // Extend Jest matchers
 expect.extend({ toMatchImageSnapshot });
@@ -42,18 +42,16 @@ afterAll(async () => {
 });
 
 // Global test utilities available to all tests
-Object.assign(global, {
-  UI_ARTIFACT_DIR: artifactDir,
-  SCREENS_DIR: screensDir,
-  HAR_DIR: harDir,
-  LOGS_DIR: logsDir,
-});
+(global as any).UI_ARTIFACT_DIR = artifactDir;
+(global as any).SCREENS_DIR = screensDir;
+(global as any).HAR_DIR = harDir;
+(global as any).LOGS_DIR = logsDir;
 
 // Redact sensitive env vars from snapshots/logs
 if (process.env.LLM_API_KEY) {
   // Replace in any string outputs
   const originalLog = console.log;
-  console.log = function (...args) {
+  console.log = (...args: any[]) => {
     const redacted = args.map((arg) => {
       if (typeof arg === 'string') {
         return arg.replace(
@@ -63,7 +61,7 @@ if (process.env.LLM_API_KEY) {
       }
       return arg;
     });
-    originalLog.apply(console, redacted);
+    originalLog(...redacted);
   };
 }
 
@@ -71,7 +69,7 @@ if (process.env.LLM_API_KEY) {
 const originalEnv = { ...process.env };
 process.env = new Proxy(process.env, {
   get(target, prop) {
-    const value = target[String(prop)];
+    const value = target[prop as string];
     if (typeof prop === 'string' && /API[_-]?KEY|SECRET|TOKEN/i.test(prop)) {
       return value ? '***' : undefined;
     }

@@ -7,9 +7,12 @@ module.exports = {
     : process.env.LIVE_LLM === '1'
     ? ['**/tests/ui/**/*.spec.ts', '!**/tests/ui/failpack/**/*.spec.ts']
     : ['**/tests/ui/**/*.spec.ts', '!**/tests/ui/failpack/**/*.spec.ts', '!**/tests/ui/chat.live.spec.ts'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testTimeout: 30000,
   maxWorkers: 1, // Run tests serially for stability
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', { isolatedModules: true }],
+  },
   globals: {
     UI_ARTIFACT_DIR: process.env.UI_ARTIFACT_DIR || 'artifacts/ui-test',
   },
