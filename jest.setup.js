@@ -2,11 +2,11 @@
  * Jest setup: extend expect, register image snapshot, configure global artifact dir, console gate
  */
 
-import { toMatchImageSnapshot } from 'jest-image-snapshot';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { installFakeTimers, uninstallFakeTimers } from './tests/utils/clock';
-import { initRng, resetRng } from './tests/utils/rng';
+const { toMatchImageSnapshot } = require('jest-image-snapshot');
+const fs = require('fs/promises');
+const path = require('path');
+const { installFakeTimers, uninstallFakeTimers } = require('./tests/utils/clock');
+const { initRng, resetRng } = require('./tests/utils/rng');
 
 // Extend Jest matchers
 expect.extend({ toMatchImageSnapshot });
@@ -26,10 +26,10 @@ async function ensureArtifactDirs() {
 // Run before all tests
 beforeAll(async () => {
   await ensureArtifactDirs();
-  
+
   // Initialize fake timers for deterministic tests
   installFakeTimers(Date.now());
-  
+
   // Initialize seeded RNG
   const seed = process.env.TEST_SEED ? parseInt(process.env.TEST_SEED, 10) : 12345;
   initRng(seed);
@@ -83,4 +83,3 @@ process.env = new Proxy(process.env, {
 afterAll(() => {
   process.env = originalEnv;
 });
-

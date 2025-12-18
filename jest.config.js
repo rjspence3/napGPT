@@ -7,7 +7,7 @@ module.exports = {
     : process.env.LIVE_LLM === '1'
     ? ['**/tests/ui/**/*.spec.ts', '!**/tests/ui/failpack/**/*.spec.ts']
     : ['**/tests/ui/**/*.spec.ts', '!**/tests/ui/failpack/**/*.spec.ts', '!**/tests/ui/chat.live.spec.ts'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testTimeout: 30000,
   maxWorkers: 1, // Run tests serially for stability
   globals: {
