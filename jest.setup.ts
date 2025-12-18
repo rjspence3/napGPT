@@ -53,7 +53,7 @@ Object.assign(global, {
 if (process.env.LLM_API_KEY) {
   // Replace in any string outputs
   const originalLog = console.log;
-  console.log = (...args: any[]) => {
+  console.log = function (...args) {
     const redacted = args.map((arg) => {
       if (typeof arg === 'string') {
         return arg.replace(
@@ -63,7 +63,7 @@ if (process.env.LLM_API_KEY) {
       }
       return arg;
     });
-    originalLog(...redacted);
+    originalLog.apply(console, redacted);
   };
 }
 
@@ -71,7 +71,7 @@ if (process.env.LLM_API_KEY) {
 const originalEnv = { ...process.env };
 process.env = new Proxy(process.env, {
   get(target, prop) {
-    const value = target[prop as string];
+    const value = target[String(prop)];
     if (typeof prop === 'string' && /API[_-]?KEY|SECRET|TOKEN/i.test(prop)) {
       return value ? '***' : undefined;
     }
