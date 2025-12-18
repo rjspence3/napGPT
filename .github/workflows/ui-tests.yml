@@ -18,7 +18,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         mode: [headless, headful]
-    
+    env:
+      HAS_LIVE_LLM: ${{ secrets.LIVE_LLM }}
+
     steps:
       - uses: actions/checkout@v4
       
@@ -52,7 +54,7 @@ jobs:
           UI_ARTIFACT_DIR: artifacts/ui-test
       
       - name: Run Live LLM tests (if key provided)
-        if: ${{ secrets.LIVE_LLM != '' }}
+        if: ${{ env.HAS_LIVE_LLM != '' }}
         run: |
           if [ "${{ matrix.mode }}" == "headful" ]; then
             HEADFUL=1 npm run test:ui-live
@@ -73,7 +75,7 @@ jobs:
           UI_ARTIFACT_DIR: artifacts/ui-test
       
       - name: Run Live LLM Matrix (nightly only)
-        if: ${{ secrets.LIVE_LLM != '' && github.event_name == 'schedule' }}
+        if: ${{ env.HAS_LIVE_LLM != '' && github.event_name == 'schedule' }}
         run: npm run test:ui-live:matrix
         env:
           E2E_BASE_URL: http://localhost:3000
