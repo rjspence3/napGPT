@@ -35,15 +35,21 @@ jobs:
       
       - name: Build app
         run: npm run build
-      
+
+      - name: Install xvfb (Ubuntu headful only)
+        if: matrix.os == 'ubuntu-latest' && matrix.mode == 'headful'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Start fake LLM server
         run: npm run test:serve-llm &
         env:
           LLM_SERVER_PORT: 3001
-      
+
       - name: Run UI tests
         run: |
-          if [ "${{ matrix.mode }}" == "headful" ]; then
+          if [ "${{ matrix.mode }}" == "headful" ] && [ "${{ runner.os }}" == "Linux" ]; then
+            xvfb-run --auto-servernum HEADFUL=1 npm run test:ui-all
+          elif [ "${{ matrix.mode }}" == "headful" ]; then
             HEADFUL=1 npm run test:ui-all
           else
             npm run test:ui-all
@@ -56,7 +62,9 @@ jobs:
       - name: Run Live LLM tests (if key provided)
         if: ${{ env.HAS_LIVE_LLM != '' }}
         run: |
-          if [ "${{ matrix.mode }}" == "headful" ]; then
+          if [ "${{ matrix.mode }}" == "headful" ] && [ "${{ runner.os }}" == "Linux" ]; then
+            xvfb-run --auto-servernum HEADFUL=1 npm run test:ui-live
+          elif [ "${{ matrix.mode }}" == "headful" ]; then
             HEADFUL=1 npm run test:ui-live
           else
             npm run test:ui-live

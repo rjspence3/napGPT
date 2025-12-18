@@ -42,10 +42,12 @@ afterAll(async () => {
 });
 
 // Global test utilities available to all tests
-(global as any).UI_ARTIFACT_DIR = artifactDir;
-(global as any).SCREENS_DIR = screensDir;
-(global as any).HAR_DIR = harDir;
-(global as any).LOGS_DIR = logsDir;
+Object.assign(global, {
+  UI_ARTIFACT_DIR: artifactDir,
+  SCREENS_DIR: screensDir,
+  HAR_DIR: harDir,
+  LOGS_DIR: logsDir,
+});
 
 // Redact sensitive env vars from snapshots/logs
 if (process.env.LLM_API_KEY) {
