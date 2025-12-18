@@ -5,6 +5,9 @@ on:
     branches: [main, develop, master]
   pull_request:
     branches: [main, develop, master]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 jobs:
   ui-tests:
