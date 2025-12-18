@@ -3,7 +3,7 @@
  * Wraps @sinonjs/fake-timers
  */
 
-import { install, InstalledClock, uninstall } from '@sinonjs/fake-timers';
+import { install, InstalledClock } from '@sinonjs/fake-timers';
 
 let clock: InstalledClock | null = null;
 
@@ -26,7 +26,7 @@ export function installFakeTimers(now: number | Date = Date.now()): InstalledClo
  */
 export function uninstallFakeTimers(): void {
   if (clock) {
-    uninstall();
+    clock.uninstall();
     clock = null;
   }
 }
