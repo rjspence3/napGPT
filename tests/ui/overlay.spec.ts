@@ -19,9 +19,11 @@ describe('Overlay States', () => {
   });
 
   beforeEach(async () => {
-    // Clear localStorage to reset persisted state (beans, etc.)
-    await page.evaluate(() => localStorage.clear());
+    // Navigate first, then clear localStorage (can't access storage on about:blank)
     await page.goto(BASE_URL, { waitUntil: 'networkidle2' });
+    await page.evaluate(() => localStorage.clear());
+    // Reload to apply cleared state
+    await page.reload({ waitUntil: 'networkidle2' });
     await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
   });
 

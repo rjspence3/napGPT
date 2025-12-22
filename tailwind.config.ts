@@ -11,9 +11,9 @@ const config: Config = {
       colors: {
         cozy: {
           latte: "#F5E6D3",
-          amber: "#E8C49A", // Lightened for WCAG AA contrast with cozy-dim
-          rose: "#F2CBCE", // Lightened for WCAG AA contrast with cozy-dim
-          warm: "#FAE5CC", // Lightened for WCAG AA contrast with cozy-dim
+          amber: "#F5DCC5", // WCAG AA: ~7:1 contrast with cozy-dim
+          rose: "#FADDE0", // WCAG AA: ~7:1 contrast with cozy-dim
+          warm: "#FEF3E8", // WCAG AA: ~9:1 contrast with cozy-dim
           dim: "#2A1F1A",
         },
       },
