@@ -4,7 +4,6 @@
 
 import { Page } from 'puppeteer';
 import { withScreenshots } from '../utils/screen';
-import { withFakeTimers } from '../utils/clock';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3000';
 
@@ -20,6 +19,8 @@ describe('Overlay States', () => {
   });
 
   beforeEach(async () => {
+    // Clear localStorage to reset persisted state (beans, etc.)
+    await page.evaluate(() => localStorage.clear());
     await page.goto(BASE_URL, { waitUntil: 'networkidle2' });
     await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
   });
@@ -52,59 +53,63 @@ describe('Overlay States', () => {
     expect(inputDisabled).toBe(true);
   });
 
-  // Skip: Node fake timers don't affect browser's setTimeout/Date in Puppeteer
-  // TODO: Reimplement using CDP to mock browser time
-  test.skip('should show idle overlay when nap timer enabled', async () => {
-    await withFakeTimers(async (clock) => {
-      // Enable nap timer
-      const toggle = await page.$('[data-testid="nap-toggle"]');
-      await toggle?.click();
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
-      // Advance time to trigger idle (30 seconds)
-      clock.tick(31000);
-      
-      // Wait for idle overlay
-      await page.waitForSelector('[data-testid="idle-overlay"]', { timeout: 2000 }).catch(() => {
-        // May not appear immediately, check if it exists
-      });
-      
-      const idleOverlay = await page.$('[data-testid="idle-overlay"]');
-      // Overlay may or may not be visible depending on timing
-      if (idleOverlay) {
-        const isVisible = await page.evaluate((el) => {
-          const style = window.getComputedStyle(el);
-          return style.display !== 'none' && style.visibility !== 'hidden';
-        }, idleOverlay);
-        expect(isVisible).toBe(true);
+  test('should show idle overlay when nap timer enabled', async () => {
+    // Enable nap timer via UI
+    const toggle = await page.$('[data-testid="nap-toggle"]');
+    await toggle?.click();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Directly manipulate store state: set idleSince to 31s ago and trigger update
+    await page.evaluate(() => {
+      const store = (window as any).__nap_store;
+      if (store) {
+        store.setState({ idleSince: Date.now() - 31000 });
+        store.getState().updateIdle?.();
       }
-    }, Date.now());
+    });
+
+    // Wait for idle overlay to appear
+    await page.waitForSelector('[data-testid="idle-overlay"]', { timeout: 3000 });
+
+    const idleOverlay = await page.$('[data-testid="idle-overlay"]');
+    expect(idleOverlay).not.toBeNull();
+
+    const isVisible = await page.evaluate((el) => {
+      const style = window.getComputedStyle(el!);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    }, idleOverlay);
+    expect(isVisible).toBe(true);
   });
 
-  // Skip: Test times out in CI - boost button state may not be testable with current setup
-  // TODO: Investigate why this hangs in CI (element may not exist or state transitions not working)
-  test.skip('should handle boost cooldown state', async () => {
+  test('should handle boost cooldown state', async () => {
+    // Verify beans available (initial = 3 after localStorage clear)
+    const beans = await page.evaluate(() =>
+      (window as any).__nap_store?.getState()?.beans ?? 0
+    );
+    expect(beans).toBeGreaterThan(0);
+
     await withScreenshots({
       page,
       testName: 'boost-cooldown',
       action: async () => {
         const boostBtn = await page.$('[data-testid="boost-btn"]');
+        expect(boostBtn).not.toBeNull();
+
         const wasEnabled = await page.evaluate(
           (el) => !(el as HTMLButtonElement).disabled,
           boostBtn
         );
-        
-        if (wasEnabled) {
-          await boostBtn?.click();
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          
-          // Verify button is now disabled (cooldown)
-          const isDisabled = await page.evaluate(
-            (el) => (el as HTMLButtonElement).disabled,
-            boostBtn
-          );
-          expect(isDisabled).toBe(true);
-        }
+        expect(wasEnabled).toBe(true);
+
+        await boostBtn?.click();
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Verify button is now disabled (cooldown)
+        const isDisabled = await page.evaluate(
+          (el) => (el as HTMLButtonElement).disabled,
+          boostBtn
+        );
+        expect(isDisabled).toBe(true);
       },
       waitDuring: 500,
       waitAfter: 1000,

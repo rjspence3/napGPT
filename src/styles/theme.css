@@ -1,9 +1,9 @@
 /* Cozy theme variables */
 :root {
   --cozy-latte: #F5E6D3;
-  --cozy-amber: #D4A574;
-  --cozy-rose: #E8B4B8;
-  --cozy-warm: #F4D1AE;
+  --cozy-amber: #E8C49A; /* Lightened for WCAG AA contrast */
+  --cozy-rose: #F2CBCE; /* Lightened for WCAG AA contrast */
+  --cozy-warm: #FAE5CC; /* Lightened for WCAG AA contrast */
   --cozy-dim: #2A1F1A;
   --cozy-shadow: rgba(0, 0, 0, 0.1);
   --cozy-radius: 1.5rem;

@@ -46,10 +46,7 @@ export async function runAxe(page: Page): Promise<AxeResults> {
 }
 
 // Known violations that are tracked but not blocking CI
-// TODO: Fix these issues and remove from allowlist
-const KNOWN_VIOLATIONS = [
-  'color-contrast', // Message text contrast - tracked in design backlog
-];
+const KNOWN_VIOLATIONS: string[] = [];
 
 /**
  * Assert zero P0 (critical/serious) violations
