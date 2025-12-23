@@ -5,9 +5,9 @@
 @layer base {
   :root {
     --cozy-latte: #F5E6D3;
-    --cozy-amber: #D4A574;
-    --cozy-rose: #E8B4B8;
-    --cozy-warm: #F4D1AE;
+    --cozy-amber: #F5DCC5;
+    --cozy-rose: #FADDE0;
+    --cozy-warm: #FEF3E8;
     --cozy-dim: #2A1F1A;
     --cozy-shadow: rgba(0, 0, 0, 0.1);
   }
