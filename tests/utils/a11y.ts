@@ -55,8 +55,7 @@ export async function runAxe(page: Page): Promise<AxeResults> {
 }
 
 // Known violations that are tracked but not blocking CI
-// Passes locally but fails in CI - likely headless Chrome rendering differences
-const KNOWN_VIOLATIONS = ['color-contrast'];
+const KNOWN_VIOLATIONS: string[] = [];
 
 /**
  * Log verbose details for violations (always runs in CI for debugging)
