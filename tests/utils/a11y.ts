@@ -4,11 +4,20 @@
 
 import { Page } from 'puppeteer';
 
+interface AxeNode {
+  html: string;
+  target: string[];
+  failureSummary?: string;
+  any?: Array<{ message: string; data?: any }>;
+}
+
 interface AxeViolation {
   id: string;
   impact: 'critical' | 'serious' | 'moderate' | 'minor';
   description: string;
-  nodes: Array<{ html: string; target: string[] }>;
+  help: string;
+  helpUrl: string;
+  nodes: AxeNode[];
 }
 
 interface AxeResults {
@@ -50,20 +59,64 @@ export async function runAxe(page: Page): Promise<AxeResults> {
 const KNOWN_VIOLATIONS = ['color-contrast'];
 
 /**
+ * Log verbose details for violations (always runs in CI for debugging)
+ */
+function logViolationDetails(violations: AxeViolation[], label: string): void {
+  if (violations.length === 0) return;
+
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`AXE VIOLATIONS: ${label} (${violations.length} total)`);
+  console.log('='.repeat(60));
+
+  for (const v of violations) {
+    console.log(`\n[${v.impact.toUpperCase()}] ${v.id}`);
+    console.log(`Description: ${v.description}`);
+    console.log(`Help: ${v.help}`);
+    console.log(`Info: ${v.helpUrl}`);
+    console.log(`Affected elements (${v.nodes.length}):`);
+
+    for (const node of v.nodes) {
+      console.log(`  - Selector: ${node.target.join(' > ')}`);
+      console.log(`    HTML: ${node.html.substring(0, 150)}${node.html.length > 150 ? '...' : ''}`);
+      if (node.failureSummary) {
+        console.log(`    Failure: ${node.failureSummary.replace(/\n/g, '\n             ')}`);
+      }
+      if (node.any && node.any.length > 0) {
+        for (const check of node.any) {
+          if (check.data) {
+            console.log(`    Data: ${JSON.stringify(check.data)}`);
+          }
+        }
+      }
+    }
+  }
+  console.log('\n' + '='.repeat(60) + '\n');
+}
+
+/**
  * Assert zero P0 (critical/serious) violations
  */
 export function assertNoP0Violations(results: AxeResults, options?: { ignoreKnown?: boolean }): void {
   const ignoreKnown = options?.ignoreKnown ?? (process.env.CI === 'true');
 
-  let p0Violations = results.violations.filter(
+  const allP0Violations = results.violations.filter(
     (v) => v.impact === 'critical' || v.impact === 'serious'
   );
 
-  if (ignoreKnown) {
-    p0Violations = p0Violations.filter((v) => !KNOWN_VIOLATIONS.includes(v.id));
+  // Always log ignored violations in CI for debugging
+  if (process.env.CI === 'true' && ignoreKnown) {
+    const ignoredViolations = allP0Violations.filter((v) => KNOWN_VIOLATIONS.includes(v.id));
+    if (ignoredViolations.length > 0) {
+      logViolationDetails(ignoredViolations, 'IGNORED (allowlisted)');
+    }
   }
 
+  const p0Violations = ignoreKnown
+    ? allP0Violations.filter((v) => !KNOWN_VIOLATIONS.includes(v.id))
+    : allP0Violations;
+
   if (p0Violations.length > 0) {
+    logViolationDetails(p0Violations, 'FAILING');
     const messages = p0Violations.map((v) =>
       `${v.id} (${v.impact}): ${v.description}`
     );
