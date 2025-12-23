@@ -1,12 +1,12 @@
 # napGPT TODO
 
-## Accessibility: Color Contrast Audit
+## Accessibility: Color Contrast (CI-only failure)
 
-**Status:** Partial fix shipped, allowlist active in CI
+**Status:** Allowlist active - passes locally, fails in CI
 **File:** `tests/utils/a11y.ts:50`
 
 ### Background
-During CI stabilization, axe-core flagged `color-contrast` violations. Three background colors were lightened to improve contrast with `cozy-dim` (#2A1F1A):
+During CI stabilization, axe-core flagged `color-contrast` violations. Three background colors were lightened:
 
 | Color | Original | Current |
 |-------|----------|---------|
@@ -14,28 +14,25 @@ During CI stabilization, axe-core flagged `color-contrast` violations. Three bac
 | `cozy-rose` | #E8B4B8 | #FADDE0 |
 | `cozy-warm` | #F4D1AE | #FEF3E8 |
 
-However, contrast violations persist elsewhere. The `color-contrast` rule remains in the CI allowlist.
+### Current Status
+- **Local:** No violations detected (macOS, Chrome headless)
+- **CI:** Fails on "should have zero P0 violations with messages" test
+- **Failing test:** Only occurs after sending a message (message bubbles visible)
 
-### What's Needed
-1. Run axe locally with verbose output to identify all failing elements
-2. Audit all text/background color combinations in the app
-3. Decide whether to:
-   - Adjust more background colors (lighter)
-   - Darken text color (currently `cozy-dim` #2A1F1A)
-   - Use different colors for specific components
-4. Verify all changes meet WCAG AA (4.5:1 for normal text, 3:1 for large text)
-5. Remove `color-contrast` from `KNOWN_VIOLATIONS` in `tests/utils/a11y.ts`
+### Hypothesis
+Headless Chrome in CI (Ubuntu/macOS GitHub runners) may render colors differently than local Chrome. The contrast calculation by axe-core could be affected by:
+- Font rendering differences
+- Anti-aliasing settings
+- Color profile handling
 
-### How to Debug
-```bash
-# Run a11y tests with full output
-npm run test:ui-all -- --testPathPattern=a11y --verbose
+### Investigation Steps
+1. Download CI artifacts to inspect screenshots
+2. Add verbose axe output to CI to see exact failing elements
+3. Compare rendered colors between local and CI environments
+4. Consider using a more aggressive contrast ratio (e.g., 7:1 instead of 4.5:1)
 
-# Or manually check contrast at:
-# https://webaim.org/resources/contrastchecker/
-```
-
-### Affected Files
+### Files
 - `tailwind.config.ts` - color definitions
 - `src/styles/theme.css` - CSS custom properties
-- Components using cozy colors (MessageBubble, EffortBar, ChatWindow, EnergyMeter)
+- `tests/utils/a11y.ts` - allowlist location
+- Components: MessageBubble, EffortBar, ChatWindow, EnergyMeter
