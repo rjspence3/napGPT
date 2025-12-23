@@ -260,3 +260,33 @@ MIT
 
 **Note**: This is a parody project. NapGPT is intentionally lazy and may not always be helpful. That's the point! 😴
 
+---
+
+## Local Development Routing
+
+This project is part of a multi-project dev environment with Caddy reverse proxy.
+
+| Type | URL |
+|------|-----|
+| Domain | http://nap-gpt.test/ |
+| Direct | http://localhost:3000/ |
+
+**Start this service:**
+```bash
+npm run dev:nap-gpt
+# Or: pnpm dev -p 3000
+```
+
+**Full environment:**
+```bash
+# Start all services + Caddy proxy
+~/Development/dev/run_all.sh
+
+# Stop all services
+~/Development/dev/stop_all.sh
+```
+
+**Prerequisites:** Caddy installed (`brew install caddy`), hosts entries configured (see `~/Development/dev/hosts.test.txt`)
+
+**Dashboard:** http://devhub.test/ | **Port registry:** `~/Development/dev/ports.json`
+

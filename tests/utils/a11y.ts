@@ -46,8 +46,7 @@ export async function runAxe(page: Page): Promise<AxeResults> {
 }
 
 // Known violations that are tracked but not blocking CI
-// TODO: Remaining contrast issues beyond cozy-amber/rose/warm - needs design audit
-const KNOWN_VIOLATIONS = ['color-contrast'];
+const KNOWN_VIOLATIONS: string[] = [];
 
 /**
  * Assert zero P0 (critical/serious) violations
