@@ -54,6 +54,7 @@ export function MessageBubble({ content, isUser, isTyping, 'data-testid': dataTe
             ? "bg-cozy-amber text-cozy-dim"
             : "bg-cozy-warm text-cozy-dim"
         )}
+        style={{ isolation: 'isolate' }}
         animate={
           !isUser
             ? {
@@ -71,7 +72,10 @@ export function MessageBubble({ content, isUser, isTyping, 'data-testid': dataTe
             : {}
         }
       >
-        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: '#2A1F1A' }}>{(content ?? "").toString()}</p>
+        <p
+          className="text-sm leading-relaxed whitespace-pre-wrap break-words"
+          style={{ color: '#2A1F1A', isolation: 'isolate' }}
+        >{(content ?? "").toString()}</p>
       </motion.div>
     </motion.div>
   );
