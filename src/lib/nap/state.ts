@@ -1,32 +1,59 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+/** State for blanket overlay */
 export type BlanketState = {
+  /** Whether the blanket mode is active */
   blanketOn: boolean;
+  /** Toggles the blanket mode */
   toggleBlanket: () => void;
 };
 
+/** State for coffee bean currency */
 export type CoffeeState = {
+  /** Current number of coffee beans */
   beans: number;
+  /** Attempts to spend a bean. Returns true if successful. */
   spendBean: () => boolean;
+  /** Earns a bean (up to max) */
   earnBean: () => void;
 };
 
+/**
+ * Combined application state interface
+ */
 export interface NapState extends BlanketState, CoffeeState {
+  /** Current effort level (0-100) */
   effort: number;
+  /** Current energy level (0-100) */
   energy: number;
+  /** Timestamp when user became idle, or null if active */
   idleSince: number | null;
+  /** Whether the user is currently considered "napping" (away) */
   isNapping: boolean;
+  /** Remaining cooldown for boost in ms (for UI display) */
   boostCooldown: number;
+  /** Timestamp when boost cooldown ends */
   boostCooldownUntil: number; // Timestamp when cooldown ends (for reliable state)
+  /** Whether the auto-nap timer is enabled */
   napTimerEnabled: boolean;
+  /** Sets the effort level explicitly */
   setEffort: (effort: number) => void;
+  /** Consumes energy */
   consumeEnergy: (amount: number) => void;
+  /** Refills energy if idle */
   refillEnergy: () => void;
+  /** Activates boost if allowed */
   triggerBoost: () => void;
+  /** Toggles the auto-nap timer */
   toggleNapTimer: () => void;
+  /** Manually sets napping state */
   setNapping: (napping: boolean) => void;
+  /** Updates idle state based on activity */
   updateIdle: () => void;
+  /** Wakes from nap state (dismisses idle overlay) */
+  wake: () => void;
+  /** Checks if boost is currently on cooldown */
   isBoostOnCooldown: () => boolean; // Computed selector
 }
 
@@ -173,6 +200,10 @@ export const useNapStore = create<NapState>()(
         } else if (idleTime <= IDLE_THRESHOLD && state.isNapping) {
           set({ isNapping: false });
         }
+      },
+
+      wake: () => {
+        set({ isNapping: false, idleSince: Date.now() });
       },
 
       toggleBlanket: () => {

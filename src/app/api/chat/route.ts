@@ -71,6 +71,15 @@ function getBoostFromCookie(request: NextRequest): number {
   return 0;
 }
 
+/**
+ * POST /api/chat
+ * Handles chat generation requests.
+ * Features:
+ * - Rate limiting
+ * - Effort/Laziness logic via engine
+ * - Chaos testing flags
+ * - Mock mode support
+ */
 export async function POST(request: NextRequest) {
   // Chaos engineering flags (for testing)
   const chaosLatency = Number(process.env.CHAOS_LATENCY_MS || 0);
@@ -121,8 +130,8 @@ export async function POST(request: NextRequest) {
     ...(process.env.NAPGPT_DISABLE_DREAM_DRIFT === '1' && { dreamDriftProb: 0 }),
   };
 
-  // Set seeded RNG if test seed provided
-  if (process.env.NAPGPT_TEST_SEED) {
+  // Set seeded RNG if test seed provided (test mode only for security)
+  if (process.env.NAPGPT_TEST_SEED && isTestMode()) {
     const seed = parseInt(process.env.NAPGPT_TEST_SEED, 10);
     // Simple seeded RNG (LCG) - same algorithm as tests/utils/rng.ts
     let rngState = seed % 2147483647;
@@ -131,6 +140,8 @@ export async function POST(request: NextRequest) {
       rngState = (rngState * 16807) % 2147483647;
       return (rngState - 1) / 2147483646;
     };
+  } else if (process.env.NAPGPT_TEST_SEED && !isTestMode()) {
+    console.warn('[API] NAPGPT_TEST_SEED is set but not in test mode - ignoring for security');
   }
 
   // Convert messages to LLMMessage format (preprocessing happens in engine.ts)
@@ -304,7 +315,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper endpoint to set boost cookie
+/**
+ * PUT /api/chat
+ * Sets a temporary "boost" cookie to increase effort for next request.
+ */
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -332,7 +346,10 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// Helper endpoint to clear rate limit (test mode only)
+/**
+ * DELETE /api/chat
+ * Clears rate limits (Test environment only).
+ */
 export async function DELETE(request: NextRequest) {
   if (!isTestMode()) {
     return NextResponse.json(

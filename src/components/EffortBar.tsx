@@ -4,6 +4,10 @@ import { useNapStore } from "@/lib/nap/state";
 import { Coffee, Moon } from "lucide-react";
 import { useState, useEffect } from "react";
 
+/**
+ * Control bar for managing effort and boosting energy
+ * Displays effort slider, boost button, and coffee bean count.
+ */
 export function EffortBar() {
   const effort = useNapStore((state) => state.effort);
   const setEffort = useNapStore((state) => state.setEffort);
@@ -35,7 +39,14 @@ export function EffortBar() {
     }
   }, [boostCooldown]);
 
+  /**
+   * Triggers a temporary effort boost
+   * Consumes a coffee bean and initiates a cooldown
+   */
   const handleBoost = async () => {
+    // Double-check cooldown with fresh state to prevent race condition
+    const state = useNapStore.getState();
+    if (state.boostCooldownUntil > Date.now()) return;
     if (boostCooldown > 0) return;
 
     // Check if we have beans
@@ -59,6 +70,10 @@ export function EffortBar() {
     }
   };
 
+  /**
+   * Updates the global effort state
+   * @param value - New effort level (0-100)
+   */
   const handleEffortChange = (value: number) => {
     setLocalEffort(value);
     setEffort(value);
@@ -111,10 +126,9 @@ export function EffortBar() {
           className={`
             flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm
             transition-all duration-200
-            ${
-              boostDisabled || beans === 0
-                ? "bg-cozy-amber/20 text-cozy-dim/50 cursor-not-allowed"
-                : "bg-cozy-amber text-cozy-dim hover:bg-cozy-amber/90 active:scale-95"
+            ${boostDisabled || beans === 0
+              ? "bg-cozy-amber/20 text-cozy-dim/50 cursor-not-allowed"
+              : "bg-cozy-amber text-cozy-dim hover:bg-cozy-amber/90 active:scale-95"
             }
           `}
           aria-label="Boost energy"
@@ -130,10 +144,9 @@ export function EffortBar() {
         className={`
           flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm
           transition-all duration-200
-          ${
-            napTimerEnabled
-              ? "bg-cozy-rose text-cozy-dim hover:bg-cozy-rose/90"
-              : "bg-cozy-amber/30 text-cozy-dim hover:bg-cozy-amber/40"
+          ${napTimerEnabled
+            ? "bg-cozy-rose text-cozy-dim hover:bg-cozy-rose/90"
+            : "bg-cozy-amber/30 text-cozy-dim hover:bg-cozy-amber/40"
           }
           active:scale-95
         `}

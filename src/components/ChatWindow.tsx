@@ -12,15 +12,21 @@ interface Message {
   content: string;
 }
 
+/**
+ * Main chat interface component
+ * Handles message history, user input, and interactions with the NapGPT engine.
+ */
 export function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isNapping, setIsNapping] = useState(false);
+  const [energyWarning, setEnergyWarning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const effort = useNapStore((state) => state.effort);
+  const energy = useNapStore((state) => state.energy);
   const consumeEnergy = useNapStore((state) => state.consumeEnergy);
   const updateIdle = useNapStore((state) => state.updateIdle);
   const napTimerEnabled = useNapStore((state) => state.napTimerEnabled);
@@ -43,6 +49,30 @@ export function ChatWindow() {
     return () => clearInterval(interval);
   }, [napTimerEnabled, updateIdle]);
 
+  /**
+   * Saves the last assistant reply to sessionStorage for /recall command
+   */
+  const saveLastReply = (reply: string) => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("napgpt_lastReply", reply);
+    }
+  };
+
+  /**
+   * Retrieves the last assistant reply from sessionStorage
+   */
+  const getLastReply = (): string | null => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("napgpt_lastReply");
+    }
+    return null;
+  };
+
+  /**
+   * Handles client-side slash commands like /nap and /recall
+   * @param text - The command text
+   * @returns true if command was handled locally
+   */
   const handleCommand = (text: string): boolean => {
     if (text === "/nap") {
       setIsNapping(true);
@@ -57,11 +87,37 @@ export function ChatWindow() {
       return true;
     }
 
+    if (text === "/recall" || text === "/mumble") {
+      const lastReply = getLastReply();
+      const recallResponse = lastReply
+        ? `*yawns* oh yeah, I said something like... "${lastReply.slice(0, 80)}${lastReply.length > 80 ? "..." : ""}"`
+        : "hmm... can't remember anything... my brain is all fuzzy ☁️";
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: text },
+        { role: "assistant", content: recallResponse },
+      ]);
+      return true;
+    }
+
     return false;
   };
 
+  /**
+   * Sends the user message to the API
+   * Handles optimistic updates, loading states, and error handling
+   */
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
+
+    // Block sending when energy is depleted
+    const currentEnergy = useNapStore.getState().energy;
+    if (currentEnergy === 0) {
+      setEnergyWarning(true);
+      setTimeout(() => setEnergyWarning(false), 3000);
+      return;
+    }
 
     const userMessage = input.trim();
 
@@ -73,11 +129,9 @@ export function ChatWindow() {
     setInput("");
     updateIdle();
 
-    // Handle /nap command (UI-only, shows animation)
-    if (userMessage === "/nap") {
-      if (handleCommand(userMessage)) {
-        return;
-      }
+    // Handle client-side commands (/nap, /recall)
+    if (handleCommand(userMessage)) {
+      return;
     }
     // /dream is handled by API preprocessing
 
@@ -93,8 +147,8 @@ export function ChatWindow() {
     await Promise.resolve();
 
     // Consume energy BEFORE fetch (right before, not after)
-    const currentEnergy = useNapStore.getState().energy;
-    consumeEnergy(Math.min(20, currentEnergy));
+    const energyToConsume = useNapStore.getState().energy;
+    consumeEnergy(Math.min(20, energyToConsume));
 
     try {
       // Get test config from window.__nap_test if available
@@ -176,6 +230,8 @@ export function ChatWindow() {
         ...newMessages,
         { role: "assistant", content: reply },
       ]);
+      // Save reply for /recall command
+      saveLastReply(reply);
       if (isTestMode()) {
         console.log('[ChatWindow] Messages updated, count:', newMessages.length + 1);
       }
@@ -278,6 +334,16 @@ export function ChatWindow() {
       )}
 
       <div className="px-4 pb-4">
+        {energyWarning && (
+          <div
+            className="mb-2 px-4 py-2 bg-red-900/30 text-red-400 rounded-lg text-sm text-center"
+            role="alert"
+            aria-live="polite"
+            data-testid="energy-warning"
+          >
+            Out of energy! Wait a moment to recharge.
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -296,7 +362,7 @@ export function ChatWindow() {
           />
           <button
             onClick={handleSend}
-            disabled={isLoading || !input.trim() || isNapping}
+            disabled={isLoading || !input.trim() || isNapping || energy === 0}
             className="px-6 py-3 bg-cozy-amber text-cozy-dim rounded-2xl font-medium hover:bg-cozy-amber/90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             aria-label="Send message"
             data-testid="send-btn"

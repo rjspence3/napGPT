@@ -1,5 +1,11 @@
 import { getTestRandom } from "@/lib/utils/testRandom";
 
+/**
+ * Randomly truncates text to simulate giving up midway
+ * @param text - The original text
+ * @param probability - Probability of giving up (0-1)
+ * @returns The potentially truncated text
+ */
 export function maybeGiveUpMidway(text: string, probability: number = 0.15): string {
   if (getTestRandom() > probability) return text;
 
@@ -11,6 +17,12 @@ export function maybeGiveUpMidway(text: string, probability: number = 0.15): str
   return truncated;
 }
 
+/**
+ * Randomly appends a non-sequitur to the text
+ * @param text - The original text
+ * @param probability - Probability of adding non-sequitur (0-1)
+ * @returns Text with potential non-sequitur appended
+ */
 export function maybeAddNonSequitur(text: string, probability: number = 0.1): string {
   if (getTestRandom() > probability) return text;
 
@@ -25,6 +37,12 @@ export function maybeAddNonSequitur(text: string, probability: number = 0.1): st
   return text + " " + random;
 }
 
+/**
+ * Truncate text to a maximum token count (approximate)
+ * @param text - The text to truncate
+ * @param maxTokens - Approximate max tokens
+ * @returns Truncated text
+ */
 export function truncateByTokens(text: string, maxTokens: number): string {
   const words = text.split(/\s+/);
   const estimatedTokens = words.length * 1.3; // rough estimate
@@ -35,6 +53,11 @@ export function truncateByTokens(text: string, maxTokens: number): string {
   return words.slice(0, targetWords).join(" ") + "...";
 }
 
+/**
+ * Checks if the message contains wake words (keywords that boost effort)
+ * @param message - User message
+ * @returns true if wake words found
+ */
 export function detectWakeKeywords(message: string): boolean {
   const keywords = ["motivate me", "urgent", "deadline", "important", "please help"];
   const lower = message.toLowerCase();
@@ -198,7 +221,8 @@ export function safeTruncate(s: string, min: number): string {
 
 /**
  * Command preprocessing
- * Handles /nap and /dream commands before LLM call
+ * Handles /dream command before LLM call.
+ * Note: /nap is intercepted client-side in ChatWindow.tsx (UI-only animation)
  * Note: /recall is handled in engine.ts
  */
 import type { LLMMessage } from "@/lib/llm/adapter";
@@ -216,22 +240,9 @@ export function preprocessCommands(
 
   const content = last.content.trim().toLowerCase();
 
-  if (content === "/nap") {
-    return {
-      messages: [
-        ...messages,
-        { role: "assistant", content: "… zzz (taking a tiny nap for 5 seconds)" },
-      ],
-      flags: { intercepted: true },
-    };
-  }
-
   if (content === "/dream") {
     return { messages, flags: { dream: true } };
   }
-
-  // /recall or /mumble command is handled in engine.ts, not here
-  // This check is just for future extensibility
 
   return { messages, flags: {} };
 }

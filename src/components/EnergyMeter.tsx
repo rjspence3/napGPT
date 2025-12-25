@@ -4,6 +4,11 @@ import { motion } from "framer-motion";
 import { useNapStore } from "@/lib/nap/state";
 import { useEffect } from "react";
 
+/**
+ * Displays the current energy level
+ * Updates automatically via the store and refills over time.
+ * Shows warning state when depleted (0 energy).
+ */
 export function EnergyMeter() {
   const energy = useNapStore((state) => state.energy);
   const refillEnergy = useNapStore((state) => state.refillEnergy);
@@ -17,15 +22,18 @@ export function EnergyMeter() {
   }, [refillEnergy]);
 
   const percentage = Math.round(energy);
+  const isDepleted = percentage === 0;
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 bg-cozy-warm/30 rounded-full backdrop-blur-sm">
-      <span className="text-xs text-cozy-dim font-medium">Energy</span>
+    <div className={`flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-sm ${isDepleted ? "bg-red-900/30" : "bg-cozy-warm/30"}`}>
+      <span className={`text-xs font-medium ${isDepleted ? "text-red-400" : "text-cozy-dim"}`}>
+        {isDepleted ? "💤 Tired" : "Energy"}
+      </span>
       <div className="w-24 h-2 bg-cozy-amber/20 rounded-full overflow-hidden">
         <motion.div
-          className="h-full bg-gradient-to-r from-cozy-amber to-cozy-rose rounded-full"
+          className={`h-full rounded-full ${isDepleted ? "bg-red-500" : "bg-gradient-to-r from-cozy-amber to-cozy-rose"}`}
           initial={{ width: 0 }}
-          animate={{ width: `${percentage}%` }}
+          animate={{ width: `${Math.max(percentage, 2)}%` }}
           transition={{ duration: 0.3 }}
           data-testid="energy-meter-bar"
           aria-valuenow={percentage}
@@ -35,7 +43,9 @@ export function EnergyMeter() {
           aria-label={`Energy level: ${percentage}%`}
         />
       </div>
-      <span className="text-xs text-cozy-dim font-medium w-8">{percentage}%</span>
+      <span className={`text-xs font-medium w-8 ${isDepleted ? "text-red-400" : "text-cozy-dim"}`}>
+        {percentage}%
+      </span>
     </div>
   );
 }
