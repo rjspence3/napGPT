@@ -12,12 +12,51 @@ interface Message {
   content: string;
 }
 
+const CHAT_HISTORY_KEY = "napgpt_chatHistory";
+
+/**
+ * Load chat history from localStorage
+ */
+function loadChatHistory(): Message[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(CHAT_HISTORY_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (m): m is Message =>
+            m && typeof m === "object" &&
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string"
+        );
+      }
+    }
+  } catch {
+    // Invalid stored data, start fresh
+  }
+  return [];
+}
+
+/**
+ * Save chat history to localStorage
+ */
+function saveChatHistory(messages: Message[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+  } catch {
+    // Storage full or unavailable, ignore
+  }
+}
+
 /**
  * Main chat interface component
  * Handles message history, user input, and interactions with the NapGPT engine.
  */
 export function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isNapping, setIsNapping] = useState(false);
@@ -38,6 +77,22 @@ export function ChatWindow() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Load chat history from localStorage on mount (client-side only)
+  useEffect(() => {
+    const stored = loadChatHistory();
+    if (stored.length > 0) {
+      setMessages(stored);
+    }
+    setHasHydrated(true);
+  }, []);
+
+  // Save chat history to localStorage when messages change (after hydration)
+  useEffect(() => {
+    if (hasHydrated && messages.length > 0) {
+      saveChatHistory(messages);
+    }
+  }, [messages, hasHydrated]);
 
   useEffect(() => {
     if (!napTimerEnabled) return;

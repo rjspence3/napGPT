@@ -5,8 +5,8 @@ import { Coffee, Moon } from "lucide-react";
 import { useState, useEffect } from "react";
 
 /**
- * Control bar for managing effort and boosting energy
- * Displays effort slider, boost button, and coffee bean count.
+ * Control bar for managing effort level
+ * Displays effort slider, effort boost button, and coffee bean count.
  */
 export function EffortBar() {
   const effort = useNapStore((state) => state.effort);
@@ -40,7 +40,7 @@ export function EffortBar() {
   }, [boostCooldown]);
 
   /**
-   * Triggers a temporary effort boost
+   * Triggers a temporary effort level boost (NOT energy)
    * Consumes a coffee bean and initiates a cooldown
    */
   const handleBoost = async () => {
@@ -96,8 +96,8 @@ export function EffortBar() {
           {toastMessage}
         </div>
       )}
-      <div className="flex-1">
-        <label className="block text-xs text-cozy-dim mb-2 font-medium">
+      <div className="flex-1" title="Higher effort = more helpful responses. Low effort = sleepy, distracted AI.">
+        <label className="block text-xs text-cozy-dim mb-2 font-medium cursor-help">
           Effort Level: {localEffort}
         </label>
         <input
@@ -114,9 +114,10 @@ export function EffortBar() {
 
       <div className="flex items-center gap-2">
         <span
-          className="text-xs text-cozy-dim font-medium"
+          className="text-xs text-cozy-dim font-medium cursor-help"
           data-testid="beans-count"
           aria-label={`${beans} coffee beans`}
+          title="Coffee beans earned by being idle. Spend them to boost effort!"
         >
           ☕ {beans}
         </span>
@@ -131,11 +132,12 @@ export function EffortBar() {
               : "bg-cozy-amber text-cozy-dim hover:bg-cozy-amber/90 active:scale-95"
             }
           `}
-          aria-label="Boost energy"
+          aria-label="Spend a coffee bean to temporarily boost effort level"
+          title="Spend ☕ to boost effort"
           data-testid="boost-btn"
         >
           <Coffee size={16} />
-          {boostDisabled ? `${boostSeconds}s` : "Boost"}
+          {boostDisabled ? `${boostSeconds}s` : "Effort+"}
         </button>
       </div>
 
@@ -151,6 +153,7 @@ export function EffortBar() {
           active:scale-95
         `}
         aria-label="Toggle nap timer"
+        title="When enabled, NapGPT will doze off if you're idle too long. Click the overlay to wake it!"
         data-testid="nap-toggle"
       >
         <Moon size={16} />
