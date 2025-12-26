@@ -9,7 +9,7 @@ const config = {
 
 async function main() {
   console.log("🚀 Starting Puppeteer demo...");
-  
+
   // Check if app is running
   const baseUrl = config.baseUrl;
   console.log(`📍 Target URL: ${baseUrl}`);
@@ -39,8 +39,8 @@ async function main() {
     }
 
     // Take initial screenshot
-    await page.screenshot({ path: "demo-initial.png" });
-    console.log("📸 Screenshot saved: demo-initial.png");
+    await page.screenshot({ path: "docs/assets/demo-initial.png" });
+    console.log("📸 Screenshot saved: docs/assets/demo-initial.png");
 
     // Check for mock mode banner
     const mockBanner = await page.$('[data-testid="mock-banner"]');
@@ -94,8 +94,8 @@ async function main() {
         console.log(`📝 Response: ${response.substring(0, 100)}...`);
 
         // Take screenshot of conversation
-        await page.screenshot({ path: "demo-with-response.png" });
-        console.log("📸 Screenshot saved: demo-with-response.png");
+        await page.screenshot({ path: "docs/assets/demo-with-response.png" });
+        console.log("📸 Screenshot saved: docs/assets/demo-with-response.png");
       } catch (e) {
         console.log("⚠️  Timeout waiting for response (this is OK in mock mode)");
       }
@@ -110,7 +110,7 @@ async function main() {
         await boostBtn.click();
         console.log("✅ Boost button clicked");
         await new Promise((resolve) => setTimeout(resolve, 500));
-        
+
         // Check if it's now disabled (cooldown)
         const isDisabled = await page.evaluate((el) => (el as HTMLButtonElement).disabled, boostBtn);
         if (isDisabled) {
@@ -133,14 +133,14 @@ async function main() {
     }
 
     // Final screenshot
-    await page.screenshot({ path: "demo-final.png" });
-    console.log("📸 Final screenshot saved: demo-final.png");
+    await page.screenshot({ path: "docs/assets/demo-final.png" });
+    console.log("📸 Final screenshot saved: docs/assets/demo-final.png");
 
     console.log("\n✅ Demo complete! All interactions successful.");
     console.log("\n📸 Screenshots saved:");
-    console.log("   - demo-initial.png");
-    console.log("   - demo-with-response.png");
-    console.log("   - demo-final.png");
+    console.log("   - docs/assets/demo-initial.png");
+    console.log("   - docs/assets/demo-with-response.png");
+    console.log("   - docs/assets/demo-final.png");
 
     // Keep browser open for 3 seconds so user can see
     await new Promise((resolve) => setTimeout(resolve, 3000));
