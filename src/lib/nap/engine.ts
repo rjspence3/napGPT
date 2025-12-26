@@ -43,15 +43,26 @@ import {
   TruncationProcessor,
 } from "./pipeline/processors";
 
+/**
+ * Response object returned by the NapGPT engine
+ */
 export interface NapResponse {
+  /** The generated text response */
   text: string;
+  /** Metadata about the generation process */
   meta: {
+    /** The strategy used (refuse, one-liner, etc.) */
     strategy: string;
+    /** The effort level used for generation */
     effort: number;
+    /** The detected user intent */
     intent: Intent;
+    /** Whether the model "gave up" mid-response */
     gaveUp: boolean;
+    /** Whether a non-sequitur was added */
     nonSequitur: boolean;
   };
+  /** Token usage statistics if available */
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -59,13 +70,22 @@ export interface NapResponse {
   };
 }
 
+/**
+ * Options for generating a response
+ */
 export interface NapOptions {
+  /** The conversation history */
   messages: LLMMessage[];
+  /** Current effort level (0-100) */
   effort: number;
+  /** Temporary effort boost from wake words */
   wakeBoost?: number;
+  /** Feature flags for this specific generation */
   flags?: {
+    /** Whether to use dream mode */
     dream?: boolean;
   };
+  /** Configuration overrides for testing */
   testConfig?: TestConfigOverrides;
 }
 
@@ -177,25 +197,6 @@ function handleRecallCommand(): string {
   return RECALL_NO_MEMORY;
 }
 
-/**
- * Main response generation function for NapGPT
- * 
- * Handles effort-based response generation with various strategies:
- * - Refuse: Low effort responses that decline to help
- * - One-liner: Very brief responses
- * - Lazy-help: Moderate effort responses with some detail
- * - Full-help: High effort comprehensive responses
- * 
- * Applies various post-processing effects:
- * - Dream drift: Whimsical fragments for dream mode
- * - Wake reactions: Responses to urgent keywords
- * - Self-references: Occasional meta-commentary
- * - Dropout: Mid-reply truncation for low effort
- * - Non-sequiturs: Random tangents
- * 
- * @param options - Configuration for response generation
- * @returns Promise resolving to NapResponse with text and metadata
- */
 /**
  * Main response generation function for NapGPT
  * 

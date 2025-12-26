@@ -10,6 +10,10 @@ import { initBeanTicker } from "@/lib/nap/coffee";
 import { isDevelopmentMode } from "@/lib/utils/env";
 import { useState, useEffect } from "react";
 
+/**
+ * Main application page
+ * Composes the ChatWindow, EffortBar, and overlays.
+ */
 export default function Home() {
   const [isMockMode, setIsMockMode] = useState(false);
 

@@ -3,13 +3,24 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+/**
+ * Props for the MessageBubble component
+ */
 interface MessageBubbleProps {
+  /** The message content to display */
   content: string;
+  /** Whether the message is from the user (true) or assistant (false) */
   isUser: boolean;
+  /** Whether to show the typing indicator state */
   isTyping?: boolean;
+  /** Optional test ID override */
   'data-testid'?: string;
 }
 
+/**
+ * Displays a single chat message bubble
+ * Supports typing indication and different styles for user/assistant
+ */
 export function MessageBubble({ content, isUser, isTyping, 'data-testid': dataTestId }: MessageBubbleProps) {
   if (isTyping) {
     return (
@@ -58,17 +69,17 @@ export function MessageBubble({ content, isUser, isTyping, 'data-testid': dataTe
         animate={
           !isUser
             ? {
-                y: [0, -2, 0],
-              }
+              y: [0, -2, 0],
+            }
             : {}
         }
         transition={
           !isUser
             ? {
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }
             : {}
         }
       >

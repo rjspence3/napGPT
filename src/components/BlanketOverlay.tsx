@@ -3,6 +3,10 @@
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useNapStore } from "@/lib/nap/state";
 
+/**
+ * Full-screen visual overlay that appears when "blanket mode" is active.
+ * Creates a cozy, dim atmosphere with particles.
+ */
 export function BlanketOverlay() {
   const blanketOn = useNapStore((state) => state.blanketOn);
   const shouldReduceMotion = useReducedMotion();
