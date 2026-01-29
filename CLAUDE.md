@@ -1,13 +1,16 @@
-# NapGPT
+<!-- AUTO-GENERATED from ports.json — do not edit manually -->
+<!-- Regenerate: python3 ~/Development/generate_claude_md.py --apply -->
 
-AI chat interface.
+# Nap Gpt
+
+Next.js + React + TypeScript project.
 
 ---
 
 ## Environment Setup
 
 ```bash
-# Install dependencies
+# Install Node dependencies
 npm install
 ```
 
@@ -17,27 +20,18 @@ npm install
 
 | Service | Domain | Port |
 |---------|--------|------|
-| Frontend (Next.js) | http://nap-gpt.test | 3000 |
+| Frontend | http://nap-gpt.test | 3000 |
 
-Port assignments are defined in `~/Development/dev/ports.json` (authoritative).
+Port assignments defined in `~/Development/dev/ports.json`.
 
 ---
 
 ## Commands
 
 ```bash
-# Start dev server
+# Start frontend
 npm run dev -- -p 3000
-
-# Build for production
-npm run build
 ```
-
----
-
-## Notes
-
-- Next.js frontend application
 
 ---
 
@@ -64,6 +58,10 @@ artifacts/
   1762884747660/
     30_idle_and_overlay/
   1762884804659/
+    35_coffee_economy/
+  1762885102950/
+    30_idle_and_overlay/
+  1762885159918/
     35_coffee_economy/
 docs/
   archive/
@@ -99,3 +97,9 @@ tests/
   unit/
   utils/
 ```
+
+---
+
+## Notes
+
+- Tech: Next.js, React, TypeScript

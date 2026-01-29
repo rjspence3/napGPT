@@ -50,7 +50,7 @@ If you don't set an API key, the app will run in **mock mode** with deterministi
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://http://nap-gpt.test](http://http://nap-gpt.test) in your browser.
 
 #### Development with Auto-Restart Monitor
 
@@ -269,7 +269,7 @@ This project is part of a multi-project dev environment with Caddy reverse proxy
 | Type | URL |
 |------|-----|
 | Domain | http://nap-gpt.test/ |
-| Direct | http://localhost:3000/ |
+| Direct | http://http://nap-gpt.test/ |
 
 **Start this service:**
 ```bash
