@@ -2,8 +2,8 @@
  * Unit tests for NapGPT behavior features
  */
 
-import { respond } from "@/lib/nap/engine";
-import { lazinessCurve, setTestRandom, resetConversationState } from "@/lib/nap/engine";
+import { respond, resetConversationState } from "@/lib/nap/engine";
+import { lazinessCurve } from "@/lib/nap/utils";
 import { detectMicroIntent, detectWakeKeywords, summarizeReply, splitOnPunctuation } from "@/lib/nap/utils";
 import { getConfig } from "@/lib/nap/config";
 import type { LLMMessage } from "@/lib/llm/adapter";
@@ -149,40 +149,6 @@ describe("NapGPT Behavior Features", () => {
       });
 
       expect(response.text).toBeTruthy();
-    });
-  });
-
-  describe("/recall command", () => {
-    it("should return recall message when /recall is sent", async () => {
-      // First, send a message to establish state
-      await respond({
-        messages: [{ role: "user", content: "Hello!" }],
-        effort: 50,
-      });
-
-      // Then recall
-      const response = await respond({
-        messages: [{ role: "user", content: "/recall" }],
-        effort: 50,
-        testConfig: {
-          ENABLE_RECALL_COMMAND: true,
-        },
-      });
-
-      expect(response.text).toContain("vaguely recall");
-    });
-
-    it("should return no memory message when no previous reply", async () => {
-      resetConversationState();
-      const response = await respond({
-        messages: [{ role: "user", content: "/recall" }],
-        effort: 50,
-        testConfig: {
-          ENABLE_RECALL_COMMAND: true,
-        },
-      });
-
-      expect(response.text).toContain("pillows");
     });
   });
 

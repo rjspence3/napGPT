@@ -1,4 +1,5 @@
 import { kv } from "@vercel/kv";
+import { isTestMode } from "@/lib/utils/env";
 
 export interface RateLimitResult {
     success: boolean;
@@ -106,12 +107,8 @@ export class RedisRateLimiter implements RateLimiter {
     }
 
     async clear(): Promise<void> {
-        // For Redis, clearing all rate limits is dangerous/expensive in production.
-        // In test mode, we might want to flush, but for now we'll make it a no-op
-        // or only clear if explicitly safe.
-        // Given this is mostly for local tests which use MemoryRateLimiter, this is fine.
-        if (process.env.NODE_ENV === 'test') {
-            // potentially await kv.flushdb();
+        if (isTestMode()) {
+            await kv.flushdb();
         }
     }
 }

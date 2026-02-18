@@ -49,13 +49,13 @@ jobs:
             libasound2
 
       - name: Run MCP tests
-        run: pnpm test:mcp
+        run: npm run test:mcp
         env:
           HEADFUL: 0
           E2E_BASE_URL: http://localhost:3000
 
       - name: Generate report
-        run: pnpm test:mcp:report
+        run: npm run test:mcp:report
         continue-on-error: true
 
       - name: Upload artifacts

@@ -66,8 +66,8 @@ export function initBlanketAuto() {
   // Set up interval to check periodically (for idle threshold)
   checkInterval = setInterval(checkBlanket, 1000);
 
-  // Export check function for testing
-  if (typeof window !== 'undefined') {
+  // Expose check function for testing (dev/test only — eliminated in production builds)
+  if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
     (window as any).__nap_blanket_check = checkBlanket;
   }
 
@@ -79,7 +79,7 @@ export function initBlanketAuto() {
     if (unsubscribe) {
       unsubscribe();
     }
-    if (typeof window !== 'undefined') {
+    if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
       delete (window as any).__nap_blanket_check;
     }
   };

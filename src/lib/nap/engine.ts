@@ -5,12 +5,11 @@ import {
   safeTruncate,
   detectWakeKeywords,
   detectMicroIntent,
-  summarizeReply,
   splitOnPunctuation,
   lazinessCurve,
   type MicroIntent,
 } from "./utils";
-import { getTestRandom, setSeed } from "@/lib/utils/testRandom";
+import { getTestRandom } from "@/lib/utils/testRandom";
 import { classifyIntent, type Intent } from "./intent";
 import { getConfig, type TestConfigOverrides } from "./config";
 import {
@@ -21,15 +20,8 @@ import {
   REFUSAL_VARIANTS,
   renderSelfRef,
   stopSequences,
-  RECALL_TEMPLATE,
-  RECALL_NO_MEMORY,
 } from "./prompts";
-import {
-  updateConversationState,
-  getLastReply,
-  isFirstTurn,
-  resetConversationState,
-} from "./conversation-state";
+import { resetConversationState } from "./conversation-state";
 import { preprocessCommands } from "./utils";
 import { PipelineContext, Processor } from "./pipeline/types";
 import {
@@ -186,18 +178,6 @@ function fallbackLine(strategy: Strategy, intent: Intent, config: ReturnType<typ
 }
 
 /**
- * Handle /recall command
- */
-function handleRecallCommand(): string {
-  const lastReply = getLastReply();
-  if (lastReply) {
-    const summary = summarizeReply(lastReply);
-    return RECALL_TEMPLATE.replace("{summary}", summary);
-  }
-  return RECALL_NO_MEMORY;
-}
-
-/**
  * Main response generation function for NapGPT
  * 
  * Handles effort-based response generation with various strategies:
@@ -223,40 +203,6 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
 
   // Get configuration with test overrides
   const config = getConfig(testConfig);
-
-  // Set test RNG seed if provided
-  if (process.env.NAPGPT_TEST_SEED) {
-    const seed = parseInt(process.env.NAPGPT_TEST_SEED, 10);
-    if (!isNaN(seed)) {
-      setSeed(seed);
-    }
-  }
-
-  // Backward compatibility: if testRandomFn is provided, use it via setTestRandom
-  if (testConfig?.testRandomFn) {
-    const { setTestRandom } = require("./utils");
-    setTestRandom(testConfig.testRandomFn);
-  }
-
-  // Check for /recall command first
-  const lastMessage = messages[messages.length - 1];
-  if (lastMessage?.role === "user") {
-    const content = lastMessage.content.trim().toLowerCase();
-    if (config.ENABLE_RECALL_COMMAND && (content === "/recall" || content === "/mumble")) {
-      const recallText = handleRecallCommand();
-      return {
-        text: recallText,
-        meta: {
-          strategy: "recall",
-          effort: baseEffort,
-          intent: "general",
-          gaveUp: false,
-          nonSequitur: false,
-        },
-        usage: undefined,
-      };
-    }
-  }
 
   // Preprocess commands (handles /nap, /dream)
   const { messages: processedMessages, flags: commandFlags } = preprocessCommands(messages);
@@ -292,13 +238,6 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
   }
 
   effectiveEffort = Math.max(0, Math.min(100, effectiveEffort));
-
-  // Apply laziness curve if enabled
-  let adjustedEffort = effectiveEffort;
-  if (config.ENABLE_LAZINESS_CURVE) {
-    const curve = lazinessCurve(effectiveEffort);
-    adjustedEffort = effectiveEffort * curve;
-  }
 
   // Get band configuration
   const band = bandFor(effectiveEffort);
@@ -398,14 +337,6 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
 
   for (const processor of processors) {
     text = processor.process(text, context);
-  }
-
-  // Update conversation state
-  updateConversationState(text, intent);
-
-  // Reset test RNG
-  if (testConfig.testRandomFn) {
-    setSeed(null);
   }
 
   return {

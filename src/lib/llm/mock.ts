@@ -10,10 +10,10 @@ export class MockLLM implements LLMAdapter {
   ];
 
   private normalResponses = [
-    "Here's a quick answer: it depends on what you're trying to do.",
-    "Well, you could try looking it up, but here's a brief explanation...",
-    "The short version is: yes, probably, but also maybe no?",
-    "I guess I can help... just this once though.",
+    "Here's a quick answer: it depends on what you're trying to do. Generally speaking, you'll want to start with the basics and build from there. There are several approaches, but the simplest usually works best.",
+    "Well, you could try looking it up, but here's a brief explanation: the concept involves a few key pieces that interact together. Once you understand the fundamentals, the rest tends to click into place.",
+    "The short version is: yes, probably, but also maybe no? It really comes down to your specific situation and what tradeoffs you're willing to make. Most solutions work fine once you pick one and stick with it.",
+    "I guess I can help... just this once though. The main thing to know here is that there's no single right answer — it depends on context. Start simple, see what breaks, and go from there.",
   ];
 
   async chat(

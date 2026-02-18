@@ -101,13 +101,18 @@ export async function runEffortBandsTest(client: MCPClient): Promise<{
         // Medium-low: one-liner or 2 sentences
         assert.assertLessThan(length, 300, `Effort ${effort}: Should be one-liner (<300 chars)`);
       } else if (effort <= 85) {
-        // Medium-high: 3-6 lines
-        assert.assertBetween(
-          length,
-          120,
-          800,
-          `Effort ${effort}: Should be medium length (120-800 chars)`
-        );
+        // Medium-high: 3-6 lines, unless the dropout processor fired (valid zzz cutoff)
+        const isDropout = responseText.includes('… zzz') || responseText.includes('... zzz');
+        if (isDropout) {
+          notes.push(`  ✓ Dropout fired (gave up mid-response)`);
+        } else {
+          assert.assertBetween(
+            length,
+            120,
+            800,
+            `Effort ${effort}: Should be medium length (120-800 chars)`
+          );
+        }
       } else {
         // High effort: longer answer, may include sign-off
         assert.assertGreaterThan(length, 100, `Effort ${effort}: Should be longer (>100 chars)`);

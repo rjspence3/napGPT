@@ -4,6 +4,7 @@
  */
 
 import { getTestRandom } from "./testRandom";
+import { isTestMode } from "./env";
 
 interface RetryOptions {
   attempts?: number;
@@ -20,12 +21,6 @@ interface TraceLog {
   replyLen?: number;
   error?: string;
 }
-
-const isTestMode = typeof window !== 'undefined' && (
-  process.env.NODE_ENV === 'test' || 
-  process.env.NEXT_PUBLIC_TEST_MODE === '1' ||
-  (window as any).__nap_test
-);
 
 export async function retryFetch<T = unknown>(
   url: string,
@@ -59,7 +54,7 @@ export async function retryFetch<T = unknown>(
       const elapsed = Date.now() - attemptStart;
 
       // Log trace (test mode only)
-      if (isTestMode) {
+      if (isTestMode()) {
         const log: TraceLog = {
           start: startTime,
           attempt,
@@ -78,7 +73,7 @@ export async function retryFetch<T = unknown>(
       }
 
       // Success or non-retryable error
-      if (isTestMode && trace.length > 0) {
+      if (isTestMode() && trace.length > 0) {
         (window as any).__nap_trace = trace;
       }
       return response;
@@ -87,7 +82,7 @@ export async function retryFetch<T = unknown>(
       const elapsed = Date.now() - attemptStart;
 
       // Log trace (test mode only)
-      if (isTestMode) {
+      if (isTestMode()) {
         const log: TraceLog = {
           start: startTime,
           attempt,
@@ -106,7 +101,7 @@ export async function retryFetch<T = unknown>(
       }
 
       // Last attempt failed
-      if (isTestMode && trace.length > 0) {
+      if (isTestMode() && trace.length > 0) {
         (window as any).__nap_trace = trace;
       }
       throw error;

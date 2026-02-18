@@ -25,6 +25,8 @@ export type CoffeeState = {
 export interface NapState extends BlanketState, CoffeeState {
   /** Current effort level (0-100) */
   effort: number;
+  /** Internal: stored interval ID for boost cooldown countdown (not persisted) */
+  _boostIntervalId: ReturnType<typeof setInterval> | null;
   /** Current energy level (0-100) */
   energy: number;
   /** Timestamp when user became idle, or null if active */
@@ -88,6 +90,7 @@ export const useNapStore = create<NapState>()(
       isNapping: false,
       boostCooldown: 0,
       boostCooldownUntil: 0, // Timestamp when cooldown ends
+      _boostIntervalId: null,
       napTimerEnabled: false,
       blanketOn: false,
       beans: BEAN_START,
@@ -138,27 +141,31 @@ export const useNapStore = create<NapState>()(
         // Check if cooldown is still active using timestamp
         if (state.boostCooldownUntil > Date.now()) return;
 
+        // Clear any existing interval before starting a new one
+        if (state._boostIntervalId !== null) {
+          clearInterval(state._boostIntervalId);
+        }
+
         const now = Date.now();
         const cooldownEnd = now + BOOST_COOLDOWN_MS;
-        set({
-          boostCooldown: BOOST_COOLDOWN_MS,
-          boostCooldownUntil: cooldownEnd
-        });
 
-        // Update display cooldown every 100ms (for UI countdown)
-        // NOTE: This interval is cleaned up when boostCooldown reaches 0
-        const interval = setInterval(() => {
-          const state = get();
-          const remaining = Math.max(0, state.boostCooldownUntil - Date.now());
+        const intervalId = setInterval(() => {
+          const current = get();
+          const remaining = Math.max(0, current.boostCooldownUntil - Date.now());
 
           if (remaining === 0) {
-            clearInterval(interval);
-            set({ boostCooldown: 0, boostCooldownUntil: 0 });
+            clearInterval(intervalId);
+            set({ boostCooldown: 0, boostCooldownUntil: 0, _boostIntervalId: null });
           } else {
             set({ boostCooldown: remaining });
           }
         }, 100);
-        // Store interval ID for manual cleanup if needed (future enhancement)
+
+        set({
+          boostCooldown: BOOST_COOLDOWN_MS,
+          boostCooldownUntil: cooldownEnd,
+          _boostIntervalId: intervalId,
+        });
       },
 
       isBoostOnCooldown: () => {
@@ -238,8 +245,8 @@ export const useNapStore = create<NapState>()(
   )
 );
 
-// Expose store for testing
-if (typeof window !== 'undefined') {
+// Expose store for testing (dev/test only — Next.js eliminates this block in production builds)
+if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
   (window as any).__nap_store = useNapStore;
 }
 

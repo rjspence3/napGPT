@@ -258,6 +258,10 @@ describe('Chat Live LLM - Real Round-Trip', () => {
       console.log('Skipping: LIVE_LLM not set');
       return;
     }
+    if (!modelMatrix?.length) {
+      console.log('Skipping: no model matrix available');
+      return;
+    }
 
     const chaosLatency = Number(process.env.CHAOS_LATENCY_MS || 0);
     const chaosFail = Number(process.env.CHAOS_FAIL_PCT || 0);
@@ -294,6 +298,10 @@ describe('Chat Live LLM - Real Round-Trip', () => {
   test('LIVE LLM: Streaming disconnect recovery', async () => {
     if (process.env.LIVE_LLM !== '1') {
       console.log('Skipping: LIVE_LLM not set');
+      return;
+    }
+    if (!modelMatrix?.length) {
+      console.log('Skipping: no model matrix available');
       return;
     }
 
@@ -336,6 +344,10 @@ describe('Chat Live LLM - Real Round-Trip', () => {
       console.log('Skipping: LIVE_LLM not set');
       return;
     }
+    if (!modelMatrix?.length) {
+      console.log('Skipping: no model matrix available');
+      return;
+    }
 
     const { provider, model } = modelMatrix[0];
     const testName = `chat-live-llm-upgrades-disabled-${provider}-${model}`;
@@ -375,6 +387,10 @@ describe('Chat Live LLM - Real Round-Trip', () => {
       console.log('Skipping: LIVE_LLM not set');
       return;
     }
+    if (!modelMatrix?.length) {
+      console.log('Skipping: no model matrix available');
+      return;
+    }
 
     const { provider, model } = modelMatrix[0];
     const testName = `chat-live-llm-wake-reaction-${provider}-${model}`;
@@ -410,6 +426,10 @@ describe('Chat Live LLM - Real Round-Trip', () => {
   test('LIVE LLM: Prompt upgrades - /recall command', async () => {
     if (process.env.LIVE_LLM !== '1') {
       console.log('Skipping: LIVE_LLM not set');
+      return;
+    }
+    if (!modelMatrix?.length) {
+      console.log('Skipping: no model matrix available');
       return;
     }
 
@@ -459,6 +479,10 @@ describe('Chat Live LLM - Real Round-Trip', () => {
   test('LIVE LLM: Slow-type (no double-send)', async () => {
     if (process.env.LIVE_LLM !== '1') {
       console.log('Skipping: LIVE_LLM not set');
+      return;
+    }
+    if (!modelMatrix?.length) {
+      console.log('Skipping: no model matrix available');
       return;
     }
 

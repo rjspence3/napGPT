@@ -120,13 +120,19 @@ jobs:
             sleep 2
             elapsed=$((elapsed + 2))
           done
-      
+
+      - name: Install xvfb (headful only)
+        if: matrix.headful == '1'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Run UI tests
         run: |
           if [ "${{ matrix.live }}" == "1" ]; then
             LIVE_LLM=1 MODEL_MATRIX="${{ matrix.provider }}:${{ matrix.model }}" npm run test:ui:live
+          elif [ "${{ matrix.headful }}" == "1" ]; then
+            xvfb-run --auto-servernum HEADFUL=1 npm run test:ui:headless
           else
-            HEADFUL=${{ matrix.headful }} npm run test:ui:headless
+            npm run test:ui:headless
           fi
         env:
           BASE_URL: http://localhost:3000

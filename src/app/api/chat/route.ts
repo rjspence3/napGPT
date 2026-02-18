@@ -22,7 +22,6 @@ const requestSchema = z.object({
       dream: z.boolean().optional(),
     })
     .optional(),
-  sessionId: z.string().min(6).max(64).optional(),
   testConfig: z
     .object({
       dreamDriftProb: z.number().min(0).max(1).optional(),
@@ -48,10 +47,13 @@ const RATE_LIMIT_WINDOW = 60000; // 1 minute
 const rateLimiter = getRateLimiter(RATE_LIMIT, RATE_LIMIT_WINDOW);
 
 function getRateLimitKey(request: NextRequest): string {
-  // Try to get IP from headers
+  // Prefer x-real-ip (set by Vercel/Caddy); fall back to first x-forwarded-for entry.
+  // Both are proxy-controlled headers — trust depends on the deployment proxy being authoritative.
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp;
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0] : "unknown";
-  return ip;
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return "unknown";
 }
 
 // Simple cookie-based boost tracking (for MVP)
@@ -124,25 +126,11 @@ export async function POST(request: NextRequest) {
 
   const { messages: rawMessages, effort, flags, testConfig: requestTestConfig } = parsed.data;
 
-  // Merge request testConfig with env-based determinism controls
+  // Only accept testConfig overrides in test mode; ignore in production
   const testConfig: TestConfigOverrides = {
-    ...requestTestConfig,
+    ...(isTestMode() ? requestTestConfig : {}),
     ...(process.env.NAPGPT_DISABLE_DREAM_DRIFT === '1' && { dreamDriftProb: 0 }),
   };
-
-  // Set seeded RNG if test seed provided (test mode only for security)
-  if (process.env.NAPGPT_TEST_SEED && isTestMode()) {
-    const seed = parseInt(process.env.NAPGPT_TEST_SEED, 10);
-    // Simple seeded RNG (LCG) - same algorithm as tests/utils/rng.ts
-    let rngState = seed % 2147483647;
-    if (rngState <= 0) rngState += 2147483646;
-    testConfig.testRandomFn = () => {
-      rngState = (rngState * 16807) % 2147483647;
-      return (rngState - 1) / 2147483646;
-    };
-  } else if (process.env.NAPGPT_TEST_SEED && !isTestMode()) {
-    console.warn('[API] NAPGPT_TEST_SEED is set but not in test mode - ignoring for security');
-  }
 
   // Convert messages to LLMMessage format (preprocessing happens in engine.ts)
   const messages: LLMMessage[] = rawMessages.map((m) => ({
@@ -218,10 +206,6 @@ export async function POST(request: NextRequest) {
             attempt: i + 1,
             response: response,
           });
-          reply = "… zzz (having a moment, try again)";
-        }
-        // Double-check: never return empty
-        if (!reply || reply.length === 0) {
           reply = "… zzz (having a moment, try again)";
         }
 

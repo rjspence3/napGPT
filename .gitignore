@@ -43,3 +43,6 @@ next-env.d.ts
 !/artifacts/_baseline/
 !/artifacts/_baseline/.gitkeep
 
+# untracked local databases
+meme_chain_analyzer.db
+
