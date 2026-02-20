@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { isTestMode, isDevelopmentMode } from "@/lib/utils/env";
 
 /** State for blanket overlay */
 export type BlanketState = {
@@ -245,8 +246,8 @@ export const useNapStore = create<NapState>()(
   )
 );
 
-// Expose store for testing (dev/test only — Next.js eliminates this block in production builds)
-if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+// Expose store for testing (dev/test only; gated by NEXT_PUBLIC_TEST_MODE for production CI builds)
+if ((isDevelopmentMode() || isTestMode()) && typeof window !== 'undefined') {
   (window as any).__nap_store = useNapStore;
 }
 

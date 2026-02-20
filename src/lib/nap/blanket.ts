@@ -1,4 +1,5 @@
 import { useNapStore } from "./state";
+import { isTestMode, isDevelopmentMode } from "@/lib/utils/env";
 
 const BLANKET_IDLE_MS = parseInt(
   process.env.NEXT_PUBLIC_NAPGPT_BLANKET_IDLE_MS || "30000",
@@ -67,7 +68,7 @@ export function initBlanketAuto() {
   checkInterval = setInterval(checkBlanket, 1000);
 
   // Expose check function for testing (dev/test only — eliminated in production builds)
-  if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+  if ((isDevelopmentMode() || isTestMode()) && typeof window !== 'undefined') {
     (window as any).__nap_blanket_check = checkBlanket;
   }
 
@@ -79,7 +80,7 @@ export function initBlanketAuto() {
     if (unsubscribe) {
       unsubscribe();
     }
-    if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+    if ((isDevelopmentMode() || isTestMode()) && typeof window !== 'undefined') {
       delete (window as any).__nap_blanket_check;
     }
   };
