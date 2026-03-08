@@ -31,7 +31,7 @@ export function requireLiveEnv(): LiveEnv {
     );
   }
 
-  const provider = process.env.LLM_PROVIDER || 'openai';
+  const provider = process.env.LLM_PROVIDER || 'anthropic';
   if (!['openai', 'anthropic'].includes(provider)) {
     throw new Error(
       `LLM_PROVIDER must be one of: openai, anthropic. Got: ${provider}`
@@ -45,7 +45,7 @@ export function requireLiveEnv(): LiveEnv {
     );
   }
 
-  const model = process.env.LLM_MODEL || (provider === 'openai' ? 'gpt-4o-mini' : 'claude-3-5-sonnet-20241022');
+  const model = process.env.LLM_MODEL || (provider === 'openai' ? 'gpt-4o-mini' : 'claude-sonnet-4-5');
   const maxTokens = parseInt(process.env.LLM_MAX_TOKENS || '128', 10);
 
   return {
