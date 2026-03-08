@@ -41,7 +41,17 @@ export default function Home() {
   return (
     <main className="h-screen flex flex-col bg-cozy-latte">
       <header className="flex items-center justify-between px-6 py-4 bg-cozy-warm/30 backdrop-blur-sm border-b border-cozy-amber/20">
-        <h1 className="text-2xl font-bold text-cozy-dim">NapGPT</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-cozy-dim">NapGPT</h1>
+          <a
+            href="https://nomouthlabs.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-cozy-dim/60 hover:text-cozy-dim/90 transition-colors"
+          >
+            by No Mouth Labs ↗
+          </a>
+        </div>
         <EnergyMeter />
       </header>
 
