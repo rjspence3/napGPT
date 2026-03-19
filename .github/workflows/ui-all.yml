@@ -30,12 +30,14 @@ jobs:
       
       - name: Build app
         run: npm run build
-      
+        env:
+          NEXT_PUBLIC_TEST_MODE: '1'
+
       - name: Start app
         run: npm run start &
         env:
           PORT: 3000
-      
+
       - name: Wait for app
         run: |
           timeout=60
@@ -48,7 +50,7 @@ jobs:
             sleep 2
             elapsed=$((elapsed + 2))
           done
-      
+
       - name: Run UI tests (headless)
         run: npm run test:ui:headless
         env:
@@ -102,12 +104,14 @@ jobs:
       
       - name: Build app
         run: npm run build
-      
+        env:
+          NEXT_PUBLIC_TEST_MODE: '1'
+
       - name: Start app
         run: npm run start &
         env:
           PORT: 3000
-      
+
       - name: Wait for app
         run: |
           timeout=60

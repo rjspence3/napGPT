@@ -47,7 +47,7 @@ export default function Home() {
             href="https://nomouthlabs.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-cozy-dim/60 hover:text-cozy-dim/90 transition-colors"
+            className="text-xs text-cozy-dim/80 hover:text-cozy-dim/90 transition-colors"
           >
             by No Mouth Labs ↗
           </a>
