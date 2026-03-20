@@ -1,7 +1,4 @@
-<!-- AUTO-GENERATED from ports.json — do not edit manually -->
-<!-- Regenerate: python3 ~/Development/generate_claude_md.py --apply -->
-
-# Nap Gpt
+# napGPT
 
 Next.js + React + TypeScript project.
 
@@ -16,21 +13,11 @@ npm install
 
 ---
 
-## Local Access
-
-| Service | Domain | Port |
-|---------|--------|------|
-| Frontend | http://nap-gpt.test | 3000 |
-
-Port assignments defined in `~/Development/dev/ports.json`.
-
----
-
 ## Commands
 
 ```bash
 # Start frontend
-npm run dev -- -p 3000
+npm run dev
 ```
 
 ---
