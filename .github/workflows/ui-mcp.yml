@@ -2,9 +2,9 @@ name: UI MCP Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, master]
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, master]
   workflow_dispatch:
 
 jobs:
@@ -27,11 +27,22 @@ jobs:
         run: npm run build
 
       - name: Start application
-        run: |
-          npm start &
-          npx wait-on http://localhost:3000 --timeout 60000
+        run: npm start &
         env:
           PORT: 3000
+
+      - name: Wait for application
+        run: |
+          timeout=60
+          elapsed=0
+          while ! curl -f http://localhost:3000 > /dev/null 2>&1; do
+            if [ $elapsed -ge $timeout ]; then
+              echo "App failed to start"
+              exit 1
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
 
       - name: Install Chrome dependencies
         run: |
@@ -76,5 +87,3 @@ jobs:
             artifacts/*/results.json
             artifacts/report.md
           retention-days: 30
-
-

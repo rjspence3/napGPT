@@ -23,29 +23,60 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build app
         run: npm run build
         env:
           NEXT_PUBLIC_TEST_MODE: '1'
 
+      # FIX: Install Chrome system dependencies required by Puppeteer (Linux only)
+      - name: Install Chrome dependencies (Ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2t64
+
       - name: Install xvfb (Ubuntu headful only)
         if: matrix.os == 'ubuntu-latest' && matrix.mode == 'headful'
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
-      - name: Start fake LLM server
-        run: npm run test:serve-llm &
+      # FIX: Explicitly start the app before tests (jest-puppeteer auto-start is silent on failure)
+      - name: Start app
+        run: npm run start &
         env:
-          LLM_SERVER_PORT: 3001
+          PORT: 3000
+
+      - name: Wait for app
+        run: |
+          timeout=60
+          elapsed=0
+          while ! curl -f http://localhost:3000 > /dev/null 2>&1; do
+            if [ $elapsed -ge $timeout ]; then
+              echo "App failed to start within ${timeout}s"
+              exit 1
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
 
       - name: Run UI tests
         run: |
@@ -58,9 +89,8 @@ jobs:
           fi
         env:
           E2E_BASE_URL: http://localhost:3000
-          LLM_BASE_URL: http://localhost:3001
           UI_ARTIFACT_DIR: artifacts/ui-test
-      
+
       - name: Run Live LLM tests (if key provided)
         if: ${{ env.HAS_LIVE_LLM != '' }}
         run: |
@@ -83,7 +113,7 @@ jobs:
           NAPGPT_DISABLE_DREAM_DRIFT: 1
           NAPGPT_DISABLE_SHEEP: 1
           UI_ARTIFACT_DIR: artifacts/ui-test
-      
+
       - name: Run Live LLM Matrix (nightly only)
         if: ${{ env.HAS_LIVE_LLM != '' && github.event_name == 'schedule' }}
         run: npm run test:ui-live:matrix
@@ -98,15 +128,15 @@ jobs:
           NAPGPT_DISABLE_DREAM_DRIFT: 1
           NAPGPT_DISABLE_SHEEP: 1
           UI_ARTIFACT_DIR: artifacts/ui-test
-      
+
       - name: Budget Gate
         run: npm run test:ui:budget-gate
         continue-on-error: false
-      
+
       - name: Flake Guard
         run: npm run test:ui:flake-guard
         continue-on-error: true  # Flake guard scenarios require local setup - don't block CI
-      
+
       - name: Upload artifacts (on failure or nightly)
         if: failure() || github.event_name == 'schedule'
         uses: actions/upload-artifact@v4
@@ -121,30 +151,30 @@ jobs:
             artifacts/ui-test/metrics.json
             artifacts/lighthouse/**
           retention-days: 7
-  
+
   lighthouse-ci:
     name: Lighthouse CI
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build app
         run: npm run build
-      
+
       - name: Run Lighthouse CI
         run: npm run ci:lighthouse
-      
+
       - name: Upload Lighthouse reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -157,27 +187,43 @@ jobs:
     name: Regression Watch (Nightly Chaos)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build app
         run: npm run build
-      
+
+      # FIX: Install Chrome system dependencies required by Puppeteer on Linux
+      - name: Install Chrome dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2t64
+
       - name: Start fake LLM server
         run: npm run test:serve-llm &
         env:
           LLM_SERVER_PORT: 3001
-      
+
       - name: Run regression watch with chaos flags
         run: npm run test:ui-live:chaos
         env:
@@ -195,11 +241,11 @@ jobs:
           NAPGPT_DISABLE_DREAM_DRIFT: 1
           NAPGPT_DISABLE_SHEEP: 1
           UI_ARTIFACT_DIR: artifacts/ui-test
-      
+
       - name: Budget Gate
         run: npm run test:ui:budget-gate
         continue-on-error: false
-      
+
       - name: Upload regression artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -211,4 +257,3 @@ jobs:
             artifacts/ui-test/logs/**
             artifacts/ui-test/metrics.json
           retention-days: 30
-

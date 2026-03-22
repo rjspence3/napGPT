@@ -2,9 +2,9 @@ name: UI Tests (Full Suite)
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, master]
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, master]
   schedule:
     # Run nightly at 2 AM UTC
     - cron: '0 2 * * *'
@@ -15,23 +15,39 @@ jobs:
     name: UI Tests (PR)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'push'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build app
         run: npm run build
         env:
           NEXT_PUBLIC_TEST_MODE: '1'
+
+      # FIX: Install Chrome system dependencies required by Puppeteer on Linux
+      - name: Install Chrome dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2t64
 
       - name: Start app
         run: npm run start &
@@ -60,7 +76,7 @@ jobs:
           NAPGPT_TEST_SEED: 1337
           NAPGPT_DISABLE_DREAM_DRIFT: 1
           NAPGPT_DISABLE_SHEEP: 1
-      
+
       - name: Upload artifacts (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -69,12 +85,12 @@ jobs:
           path: |
             artifacts/latest/**
           retention-days: 7
-  
+
   ui-nightly:
     name: UI Tests (Nightly)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -89,23 +105,39 @@ jobs:
           - provider: anthropic
             model: claude-3-haiku
             live: '1'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build app
         run: npm run build
         env:
           NEXT_PUBLIC_TEST_MODE: '1'
+
+      # FIX: Install Chrome system dependencies required by Puppeteer on Linux
+      - name: Install Chrome dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2t64
 
       - name: Start app
         run: npm run start &
@@ -150,7 +182,7 @@ jobs:
           NAPGPT_TEST_SEED: 1337
           NAPGPT_DISABLE_DREAM_DRIFT: 1
           NAPGPT_DISABLE_SHEEP: 1
-      
+
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -159,4 +191,3 @@ jobs:
           path: |
             artifacts/latest/**
           retention-days: 30
-
