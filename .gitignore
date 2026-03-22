@@ -46,3 +46,4 @@ next-env.d.ts
 # untracked local databases
 meme_chain_analyzer.db
 
+.env.local
