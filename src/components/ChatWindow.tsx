@@ -336,12 +336,17 @@ export function ChatWindow() {
     }
   };
 
-  const isEmpty = messages.length === 0 && !isLoading;
+  const isEmpty = messages.length === 0 && !isLoading && hasHydrated;
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-6" data-testid="message-list">
-        {isEmpty ? (
+        {!hasHydrated ? (
+          <div className="flex flex-col h-full items-center justify-center gap-3" data-testid="hydration-skeleton">
+            <div className="w-48 h-3 bg-cozy-warm/50 rounded-full animate-pulse" />
+            <div className="w-32 h-3 bg-cozy-warm/30 rounded-full animate-pulse" />
+          </div>
+        ) : isEmpty ? (
           <motion.div
             className="flex flex-col items-center justify-center h-full text-center px-4"
             initial={{ opacity: 0, y: 20 }}
