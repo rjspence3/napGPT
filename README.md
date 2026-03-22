@@ -36,10 +36,10 @@ cd napGPT
 pnpm install
 ```
 
-3. (Optional) Set up OpenAI API key:
+3. (Optional) Set up Anthropic API key:
 ```bash
-# Create a .env file in the root directory
-echo "OPENAI_API_KEY=your-api-key-here" > .env
+# Create a .env.local file in the root directory (never commit this file)
+echo "ANTHROPIC_API_KEY=your-api-key-here" > .env.local
 ```
 
 If you don't set an API key, the app will run in **mock mode** with deterministic responses.
@@ -50,7 +50,7 @@ If you don't set an API key, the app will run in **mock mode** with deterministi
 pnpm dev
 ```
 
-Open [http://http://nap-gpt.test](http://http://nap-gpt.test) in your browser.
+Open [http://nap-gpt.test](http://nap-gpt.test) in your browser.
 
 #### Development with Auto-Restart Monitor
 
@@ -175,14 +175,17 @@ napgpt/
 ### Optional
 
 **API Configuration:**
-- `OPENAI_API_KEY` (optional): Your OpenAI API key. If not set, runs in mock mode.
-- `NAPGPT_MODEL` (optional): OpenAI model to use (default: `gpt-4-turbo-preview`)
+- `ANTHROPIC_API_KEY` (optional): Your Anthropic API key. Get one at [console.anthropic.com](https://console.anthropic.com). If not set, runs in mock mode.
+- `OPENAI_API_KEY` (optional): Your OpenAI API key. Set `LLM_PROVIDER=openai` to activate.
+- `NAPGPT_MODEL` (optional): Model to use (default: `claude-sonnet-4-5` for Anthropic, `gpt-4o-mini` for OpenAI)
 - `NAPGPT_MAX_TOKENS` (optional): Max tokens per response (default: `300`)
 
-**Rate Limiting (Production):**
-- `KV_URL` (optional): Redis connection URL (e.g., from Vercel KV)
-- `KV_REST_API_URL` (optional): Vercel KV REST API URL
-- `KV_REST_API_TOKEN` (optional): Vercel KV REST API Token
+**Rate Limiting (Production — Required for serverless):**
+- `KV_URL` (optional): Redis connection URL (e.g., from Upstash)
+- `KV_REST_API_URL` (optional): Upstash Redis REST API URL
+- `KV_REST_API_TOKEN` (optional): Upstash Redis REST API Token
+
+> **Note:** Rate limiting is per-instance only without Redis configured. On serverless platforms like Vercel, each cold-start instance is independent, so a single IP can bypass limits across instances. Configure Redis (`KV_*` vars) for production.
 
 **Feature Configuration:**
 - `NEXT_PUBLIC_NAPGPT_BLANKET_IDLE_MS` (optional): Idle time in ms before blanket activates (default: `30000`)
@@ -269,7 +272,6 @@ This project is part of a multi-project dev environment with Caddy reverse proxy
 | Type | URL |
 |------|-----|
 | Domain | http://nap-gpt.test/ |
-| Direct | http://http://nap-gpt.test/ |
 
 **Start this service:**
 ```bash
