@@ -14,14 +14,14 @@ A cozy, intentionally-lazy AI chatbot built with Next.js 15, TypeScript, and Tai
 - 🛌 **Blanket mode**: Automatic cozy overlay when effort is low or idle for too long
 - 🎨 **Cozy UI**: Warm palette, rounded corners, soft shadows, gentle animations
 - 🎭 **Easter eggs**: `/nap` command, `/dream` command for surreal responses
-- 🔄 **LLM adapter**: Works with OpenAI API or falls back to mock mode (no API key required)
+- 🔄 **LLM adapter**: Works with Anthropic Claude (primary) or OpenAI API, falls back to mock mode (no API key required)
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+ and pnpm (or npm/yarn)
-- (Optional) Redis database (Vercel KV) for production rate limiting
+- (Optional) Upstash Redis for production rate limiting
 
 ### Installation
 
@@ -50,7 +50,7 @@ If you don't set an API key, the app will run in **mock mode** with deterministi
 pnpm dev
 ```
 
-Open [http://nap-gpt.test](http://nap-gpt.test) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 #### Development with Auto-Restart Monitor
 
@@ -252,7 +252,7 @@ Returns the current mode (mock or real API).
 - **Tailwind CSS** + custom cozy theme
 - **Framer Motion** for animations
 - **Zustand** for state management
-- **OpenAI SDK** (optional)
+- **Anthropic SDK** (primary) / **OpenAI SDK** (optional)
 - **Playwright** for e2e testing
 
 ## License
@@ -263,32 +263,4 @@ MIT
 
 **Note**: This is a parody project. NapGPT is intentionally lazy and may not always be helpful. That's the point! 😴
 
----
-
-## Local Development Routing
-
-This project is part of a multi-project dev environment with Caddy reverse proxy.
-
-| Type | URL |
-|------|-----|
-| Domain | http://nap-gpt.test/ |
-
-**Start this service:**
-```bash
-npm run dev:nap-gpt
-# Or: pnpm dev -p 3000
-```
-
-**Full environment:**
-```bash
-# Start all services + Caddy proxy
-~/Development/dev/run_all.sh
-
-# Stop all services
-~/Development/dev/stop_all.sh
-```
-
-**Prerequisites:** Caddy installed (`brew install caddy`), hosts entries configured (see `~/Development/dev/hosts.test.txt`)
-
-**Dashboard:** http://devhub.test/ | **Port registry:** `~/Development/dev/ports.json`
 
