@@ -27,7 +27,7 @@ A cozy, intentionally-lazy AI chatbot built with Next.js 15, TypeScript, and Tai
 
 1. Clone the repository:
 ```bash
-git clone <repo-url>
+git clone https://github.com/rjspence3/napGPT.git
 cd napGPT
 ```
 
