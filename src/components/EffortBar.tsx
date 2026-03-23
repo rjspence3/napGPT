@@ -96,9 +96,12 @@ export function EffortBar() {
           {toastMessage}
         </div>
       )}
-      <div className="flex-1" title="Higher effort = more helpful responses. Low effort = sleepy, distracted AI.">
-        <label className="block text-xs text-cozy-dim mb-2 font-medium cursor-help">
+      <div className="flex-1">
+        <label className="block text-xs text-cozy-dim mb-1 font-medium">
           Effort Level: {localEffort}
+          <span className="ml-2 font-normal opacity-60">
+            {localEffort >= 70 ? "— actually trying" : localEffort >= 35 ? "— meh, fine" : "— please don't make me"}
+          </span>
         </label>
         <input
           type="range"
@@ -108,6 +111,7 @@ export function EffortBar() {
           onChange={(e) => handleEffortChange(Number(e.target.value))}
           className="w-full h-2 bg-cozy-amber/20 rounded-lg appearance-none cursor-pointer accent-cozy-amber"
           aria-label="Effort Level"
+          title="Drag to change how hard NapGPT tries. Higher effort = more helpful responses."
           data-testid="effort-slider"
         />
       </div>
