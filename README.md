@@ -1,5 +1,7 @@
 # NapGPT
 
+🔗 [Live Demo](https://napgpt.vercel.app)
+
 **The AI that just... doesn't feel like it right now.**
 
 A cozy, intentionally-lazy AI chatbot built with Next.js 15, TypeScript, and Tailwind CSS. NapGPT wraps a normal LLM with a "Nap Wrapper" that modulates responses based on an Effort Level (0-100), sometimes refusing to help, stalling, napping mid-reply, or giving one-liners.

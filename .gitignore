@@ -47,3 +47,15 @@ next-env.d.ts
 meme_chain_analyzer.db
 
 .env.local
+
+# internal docs and AI scaffolding
+.claude/
+AUDIT_*.md
+DECISIONS.md
+MIGRATION-NOTES.md
+SUMMARY.md
+rules.md
+docs/archive/
+docs/internal/
+tests/results/
+tests/screenshots/
