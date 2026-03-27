@@ -52,18 +52,25 @@ test.describe("NapGPT UI Elements - Comprehensive Tests", () => {
     });
 
     test("energy should refill over time", async ({ page }) => {
-      // Get initial energy
-      const initialEnergy = await page.locator("text=/\\d+%/").textContent();
-      const initialValue = parseInt(initialEnergy?.replace("%", "") || "0");
+      // Drain energy first so there is headroom to refill
+      await page.evaluate(() => {
+        const store = (window as any).__nap_store;
+        if (store) {
+          store.setState({ energy: 50, lastActivityAt: Date.now() - 3000 });
+        }
+      });
 
-      // Wait for energy to refill (refills every 100ms)
-      await page.waitForTimeout(500);
+      const drainedEnergy = await page.locator('[data-testid="energy-meter-bar"]').getAttribute("aria-valuenow");
+      const drainedValue = parseInt(drainedEnergy || "50");
 
-      const newEnergy = await page.locator("text=/\\d+%/").textContent();
-      const newValue = parseInt(newEnergy?.replace("%", "") || "0");
-      
-      // Energy should increase or stay at max
-      expect(newValue).toBeGreaterThanOrEqual(initialValue);
+      // Wait long enough for the 2s idle threshold + several 100ms refill ticks
+      await page.waitForTimeout(3000);
+
+      const newEnergy = await page.locator('[data-testid="energy-meter-bar"]').getAttribute("aria-valuenow");
+      const newValue = parseInt(newEnergy || "0");
+
+      // Energy must have increased — if refill is broken this will catch it
+      expect(newValue).toBeGreaterThan(drainedValue);
     });
   });
 

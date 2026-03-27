@@ -93,20 +93,23 @@ export async function runEnergyMeterTest(client: MCPClient): Promise<{
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    // Wait for energy to refill
+    // Wait for energy to refill (2s idle threshold + buffer for EnergyMeter's 100ms interval)
     notes.push("Waiting for energy refill...");
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // Check if energy increased
+    // Energy must have increased — refill is a core feature, not optional
     const finalEnergyAttr = await ops.getAttribute(cfg.selectors.energyMeterBar, "aria-valuenow");
     const finalEnergy = finalEnergyAttr ? parseInt(finalEnergyAttr, 10) : energyReadings[energyReadings.length - 1];
+    const energyBeforeRefill = energyReadings[energyReadings.length - 1];
     energyReadings.push(finalEnergy);
-    notes.push(`After refill wait: ${finalEnergy}%`);
+    notes.push(`After refill wait: ${finalEnergy}% (was ${energyBeforeRefill}%)`);
 
-    // Energy should have increased (refilling)
-    if (finalEnergy > energyReadings[energyReadings.length - 2]) {
-      notes.push("✓ Energy refilling detected");
-    }
+    assert.assertGreaterThan(
+      finalEnergy,
+      energyBeforeRefill,
+      `Energy should refill after 3s idle (was ${energyBeforeRefill}%, still ${finalEnergy}%)`
+    );
+    notes.push("✓ Energy refilling confirmed");
 
     // Save artifacts
     const artifactDir = `artifacts/${Date.now()}/40_energy_meter`;
