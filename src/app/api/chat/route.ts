@@ -37,6 +37,7 @@ const requestSchema = z.object({
       ENABLE_WAKE_REACTIONS: z.boolean().optional(),
       ENABLE_DYNAMIC_STOPS: z.boolean().optional(),
       ENABLE_RECALL_COMMAND: z.boolean().optional(),
+      ENABLE_LUCID_MOMENTS: z.boolean().optional(),
     })
     .optional(),
 });

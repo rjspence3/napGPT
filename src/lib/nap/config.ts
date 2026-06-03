@@ -2,6 +2,7 @@
  * Configuration and feature flags for NapGPT prompt system
  * All features are gated by environment variables with safe defaults
  */
+import { isTestMode } from "@/lib/utils/env";
 
 /**
  * Helper to parse boolean environment variables
@@ -47,6 +48,8 @@ export interface NapConfig {
   ENABLE_DYNAMIC_STOPS: boolean;
   /** Enables the /recall command to inspect memory */
   ENABLE_RECALL_COMMAND: boolean;
+  /** Enables rare "lucid moments" where NapGPT wakes up and answers genuinely */
+  ENABLE_LUCID_MOMENTS: boolean;
 
   /** Probability (0-1) of dream drift occurring */
   DREAM_DRIFT_PROB: number;
@@ -71,6 +74,7 @@ export interface TestConfigOverrides {
   ENABLE_WAKE_REACTIONS?: boolean;
   ENABLE_DYNAMIC_STOPS?: boolean;
   ENABLE_RECALL_COMMAND?: boolean;
+  ENABLE_LUCID_MOMENTS?: boolean;
   dreamDriftProb?: number;
   selfRefProb?: number;
   echoFragmentProb?: number;
@@ -90,6 +94,8 @@ export const cfg: NapConfig = {
   ENABLE_WAKE_REACTIONS: bool("NEXT_PUBLIC_NAPGPT_ENABLE_WAKE_REACTIONS", true),
   ENABLE_DYNAMIC_STOPS: bool("NEXT_PUBLIC_NAPGPT_ENABLE_DYNAMIC_STOPS", true),
   ENABLE_RECALL_COMMAND: bool("NEXT_PUBLIC_NAPGPT_ENABLE_RECALL_COMMAND", true),
+  // Default on in the real app, off under test so deterministic suites are unaffected.
+  ENABLE_LUCID_MOMENTS: bool("NEXT_PUBLIC_NAPGPT_ENABLE_LUCID_MOMENTS", !isTestMode()),
 
   DREAM_DRIFT_PROB: num("NEXT_PUBLIC_NAPGPT_DREAM_DRIFT_PROB", 0.07),
   SELF_REF_PROB: num("NEXT_PUBLIC_NAPGPT_SELF_REF_PROB", 0.06),
@@ -116,6 +122,7 @@ export function getConfig(overrides?: TestConfigOverrides): NapConfig {
     ...(overrides.ENABLE_WAKE_REACTIONS !== undefined && { ENABLE_WAKE_REACTIONS: overrides.ENABLE_WAKE_REACTIONS }),
     ...(overrides.ENABLE_DYNAMIC_STOPS !== undefined && { ENABLE_DYNAMIC_STOPS: overrides.ENABLE_DYNAMIC_STOPS }),
     ...(overrides.ENABLE_RECALL_COMMAND !== undefined && { ENABLE_RECALL_COMMAND: overrides.ENABLE_RECALL_COMMAND }),
+    ...(overrides.ENABLE_LUCID_MOMENTS !== undefined && { ENABLE_LUCID_MOMENTS: overrides.ENABLE_LUCID_MOMENTS }),
     ...(overrides.dreamDriftProb !== undefined && { DREAM_DRIFT_PROB: overrides.dreamDriftProb }),
     ...(overrides.selfRefProb !== undefined && { SELF_REF_PROB: overrides.selfRefProb }),
     ...(overrides.echoFragmentProb !== undefined && { ECHO_FRAGMENT_PROB: overrides.echoFragmentProb }),

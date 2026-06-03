@@ -53,6 +53,8 @@ export interface NapResponse {
     gaveUp: boolean;
     /** Whether a non-sequitur was added */
     nonSequitur: boolean;
+    /** Whether this was a rare "lucid moment" — a genuine, full answer */
+    lucid: boolean;
   };
   /** Token usage statistics if available */
   usage?: {
@@ -132,19 +134,38 @@ function bandFor(effort: number): BandConfig {
   return band || BAND_TABLE[BAND_TABLE.length - 1];
 }
 
+// "Lucid moment" tuning: below LUCID_MIN_EFFORT NapGPT never wakes up; the
+// chance ramps linearly to LUCID_MAX_CHANCE at effort 100.
+const LUCID_MIN_EFFORT = 16;
+const LUCID_MAX_CHANCE = 0.4;
+const LUCID_MAX_TOKENS = 512;
+const LUCID_TEMPERATURE = 0.5;
+
+function lucidChance(effort: number): number {
+  if (effort < LUCID_MIN_EFFORT) return 0;
+  return ((effort - LUCID_MIN_EFFORT) / (100 - LUCID_MIN_EFFORT)) * LUCID_MAX_CHANCE;
+}
+
 function buildSystemPrompt({
   effort,
   dream,
   strategy,
   microIntent,
   config,
+  lucid,
 }: {
   effort: number;
   dream: boolean;
   strategy: Strategy;
   microIntent: MicroIntent;
   config: ReturnType<typeof getConfig>;
+  lucid: boolean;
 }): string {
+  // A lucid moment overrides the sleepy persona entirely — answer for real.
+  if (lucid) {
+    return [BASE_PROMPTS.lucid, `Effort:${effort}.`].join("\n");
+  }
+
   const base = dream ? BASE_PROMPTS.dream : BASE_PROMPTS.normal;
   const tone = STRATEGY_TONES[strategy];
   const effortLine = `Effort:${effort}.`;
@@ -218,6 +239,7 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
         intent: "general",
         gaveUp: false,
         nonSequitur: false,
+        lucid: false,
       },
       usage: undefined,
     };
@@ -244,8 +266,18 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
   const intent = classifyIntent(processedMessages);
   const microIntent = detectMicroIntent(lastUserMessage);
 
-  // Select strategy using weighted random
-  const strategy = pickWeighted<Strategy>(band.weights);
+  // Rare "lucid moment": NapGPT snaps awake and answers for real. Chance scales
+  // with effort. Guarded so that when disabled (e.g. under test) we draw no
+  // random number and the strategy stream is identical to before.
+  const isLucid =
+    config.ENABLE_LUCID_MOMENTS &&
+    !mergedFlags.dream &&
+    getTestRandom() < lucidChance(effectiveEffort);
+
+  // Select strategy using weighted random; a lucid moment forces full help.
+  const strategy: Strategy = isLucid
+    ? "full-help"
+    : pickWeighted<Strategy>(band.weights);
 
   // Build system prompt
   const systemPrompt = buildSystemPrompt({
@@ -254,6 +286,7 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
     strategy,
     microIntent,
     config,
+    lucid: isLucid,
   });
 
   const llmMessages: LLMMessage[] = [
@@ -261,9 +294,14 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
     ...processedMessages,
   ];
 
-  // Determine temperature based on strategy
-  const temperature =
-    strategy === "full-help" ? 0.7 : strategy === "lazy-help" ? 0.9 : 1.1;
+  // Determine temperature based on strategy; lucid answers run cooler for accuracy.
+  const temperature = isLucid
+    ? LUCID_TEMPERATURE
+    : strategy === "full-help"
+    ? 0.7
+    : strategy === "lazy-help"
+    ? 0.9
+    : 1.1;
 
   // Get stop sequences
   const stops = stopSequences({
@@ -278,9 +316,12 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
   let usage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
 
   try {
-    // Adjust maxTokens based on laziness curve if enabled
+    // Adjust maxTokens based on laziness curve if enabled. A lucid moment gets a
+    // generous, fixed budget so the genuine answer isn't clipped.
     let maxTokens = band.maxTokens;
-    if (config.ENABLE_LAZINESS_CURVE) {
+    if (isLucid) {
+      maxTokens = LUCID_MAX_TOKENS;
+    } else if (config.ENABLE_LAZINESS_CURVE) {
       const curve = lazinessCurve(effectiveEffort);
       maxTokens = Math.floor(band.maxTokens * curve);
       maxTokens = Math.max(24, maxTokens); // Minimum tokens
@@ -324,16 +365,20 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
     history: processedMessages,
   };
 
-  const processors: Processor[] = [
-    new WakeReactionProcessor(),
-    new SelfReferenceProcessor(),
-    new DropoutProcessor(),
-    new NonSequiturProcessor(),
-    new SleepySignOffProcessor(),
-    new DreamDriftProcessor(),
-    new EchoFragmentProcessor(),
-    new TruncationProcessor(),
-  ];
+  // Skip the degradation pipeline on a lucid moment — those processors exist to
+  // lazify/truncate output, which would undo the genuine answer.
+  const processors: Processor[] = isLucid
+    ? []
+    : [
+        new WakeReactionProcessor(),
+        new SelfReferenceProcessor(),
+        new DropoutProcessor(),
+        new NonSequiturProcessor(),
+        new SleepySignOffProcessor(),
+        new DreamDriftProcessor(),
+        new EchoFragmentProcessor(),
+        new TruncationProcessor(),
+      ];
 
   for (const processor of processors) {
     text = processor.process(text, context);
@@ -347,6 +392,7 @@ export async function respond(options: NapOptions): Promise<NapResponse> {
       intent,
       gaveUp: context.metadata.gaveUp,
       nonSequitur: context.metadata.nonSequitur,
+      lucid: isLucid,
     },
     usage,
   };
