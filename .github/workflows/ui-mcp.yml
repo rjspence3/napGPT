@@ -10,6 +10,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +26,10 @@ jobs:
 
       - name: Build application
         run: npm run build
+        env:
+          # Exposes window.__nap_store and test-mode timers so MCP scenarios
+          # (beans/energy/boost/drift) are deterministic in CI. Matches ui-tests.yml.
+          NEXT_PUBLIC_TEST_MODE: '1'
 
       - name: Start application
         run: npm start &

@@ -37,7 +37,7 @@
     "test:ui:report": "tsx scripts/ui-test/report.ts",
     "test:ui:budget-gate": "tsx scripts/ui-test/budget-gate.ts",
     "test:ui:flake-guard": "tsx scripts/ui-test/flake-guard.ts",
-    "test:ui-all": "jest --runInBand",
+    "test:ui-all": "jest --runInBand --forceExit",
     "test:ui-all:headful": "HEADFUL=1 jest --runInBand",
     "test:ui-live": "LIVE_LLM=1 jest --runInBand tests/ui/chat.live.spec.ts",
     "test:ui-live:headful": "HEADFUL=1 LIVE_LLM=1 jest --runInBand tests/ui/chat.live.spec.ts",
