@@ -166,7 +166,7 @@ jobs:
           if [ "${{ matrix.live }}" == "1" ]; then
             LIVE_LLM=1 MODEL_MATRIX="${{ matrix.provider }}:${{ matrix.model }}" npm run test:ui:live
           elif [ "${{ matrix.headful }}" == "1" ]; then
-            xvfb-run --auto-servernum HEADFUL=1 npm run test:ui:headless
+            HEADFUL=1 xvfb-run --auto-servernum npm run test:ui:headless
           else
             npm run test:ui:headless
           fi
