@@ -127,11 +127,11 @@ export function EffortBar() {
         </span>
         <button
           onClick={handleBoost}
-          disabled={boostDisabled || beans === 0}
+          disabled={boostDisabled}
           className={`
             flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm
             transition-all duration-200
-            ${boostDisabled || beans === 0
+            ${boostDisabled
               ? "bg-cozy-amber/20 text-cozy-dim/50 cursor-not-allowed"
               : "bg-cozy-amber text-cozy-dim hover:bg-cozy-amber/90 active:scale-95"
             }

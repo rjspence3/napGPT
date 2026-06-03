@@ -1,7 +1,6 @@
 /**
- * Boost-refused-at-zero-beans test: with 0 beans the Boost button is disabled,
- * so a boost cannot be triggered. Verifies the button is non-interactive and
- * that attempting to click it does not start a boost or its cooldown.
+ * Boost-refused toast test: with 0 beans the Boost button stays clickable, and
+ * clicking it surfaces the "Not enough coffee beans" toast instead of boosting.
  */
 
 import type { MCPClient } from "../utils/mcpClient";
@@ -22,8 +21,8 @@ export async function runToastBoostRefusedTest(client: MCPClient): Promise<{
   try {
     notes.push("Page loaded");
 
-    // Set beans to 0 and clear any cooldown so the only thing gating the
-    // button is the empty bean balance.
+    // Set beans to 0 and clear any cooldown so the button is interactive and the
+    // only reason a boost is refused is the empty bean balance.
     await client.evaluate(() => {
       const store = (window as any).__nap_store;
       if (store) {
@@ -49,32 +48,62 @@ export async function runToastBoostRefusedTest(client: MCPClient): Promise<{
     assert.assertTrue(beans === 0, "Beans should be 0");
     notes.push(`Beans count: ${beans}`);
 
-    // With 0 beans the boost button must be disabled (no beans to spend).
+    // The button must remain clickable at 0 beans so the refusal toast can fire.
     const isDisabled = await ops.isDisabled(cfg.selectors.boostBtn);
-    assert.assertTrue(isDisabled, "Boost button should be disabled when beans are 0");
-    notes.push("Boost button disabled at 0 beans");
+    assert.assertFalse(isDisabled, "Boost button should be clickable at 0 beans (not disabled)");
+    await ops.click(cfg.selectors.boostBtn, { waitFor: 300 });
 
-    // Attempt to click anyway and confirm it is a no-op: no boost is triggered
-    // and no cooldown is started.
-    try {
-      await ops.click(cfg.selectors.boostBtn, { waitFor: 500 });
-    } catch {
-      // A disabled button may reject the click entirely — that is the expected path.
-    }
+    // Toast should appear with the refusal message.
+    const toastSelector = cfg.selectors.toastBoostRefused || '[data-testid="toast-boost-refused"]';
+    const toastVisible = await page.waitForFunction(
+      (selector: string) => {
+        const toast = document.querySelector(selector);
+        if (!toast) return false;
+        const style = window.getComputedStyle(toast);
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0' &&
+          !!toast.textContent?.includes('coffee beans')
+        );
+      },
+      { timeout: 5000 },
+      toastSelector
+    ).then(() => true).catch(() => false);
 
+    assert.assertTrue(toastVisible, "Toast should appear when boost clicked with 0 beans");
+    const toastText = await ops.getText(toastSelector);
+    assert.assertTrue(
+      toastText.includes("coffee beans"),
+      `Toast should mention coffee beans (got: ${toastText})`
+    );
+    notes.push(`Toast shown: ${toastText}`);
+
+    // Clicking with 0 beans must not have spent a (non-existent) bean or boosted.
     const stateAfter = await client.evaluate(() => {
       const store = (window as any).__nap_store;
       const s = store ? store.getState() : null;
       return s ? { beans: s.beans, boostCooldownUntil: s.boostCooldownUntil } : null;
     });
-
-    assert.assertTrue(!!stateAfter, "Store should be available");
-    assert.assertTrue(stateAfter!.beans === 0, "Beans should remain 0 after clicking disabled button");
+    assert.assertTrue(!!stateAfter && stateAfter.beans === 0, "Beans should remain 0");
     assert.assertTrue(
       !stateAfter!.boostCooldownUntil || stateAfter!.boostCooldownUntil <= Date.now(),
-      "No boost cooldown should start when the button is disabled"
+      "No boost cooldown should start when refused for lack of beans"
     );
-    notes.push("Click was a no-op: no boost, no cooldown");
+
+    // Toast should auto-dismiss within a few seconds.
+    const toastDismissed = await page.waitForFunction(
+      (selector: string) => {
+        const toast = document.querySelector(selector);
+        if (!toast) return true;
+        const style = window.getComputedStyle(toast);
+        return style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
+      },
+      { timeout: 5000 },
+      toastSelector
+    ).then(() => true).catch(() => false);
+    assert.assertTrue(toastDismissed, "Toast should auto-dismiss");
+    notes.push("Toast auto-dismissed");
 
     // Reaching here means every assertion above passed (they throw on failure).
     return {
