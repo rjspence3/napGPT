@@ -50,9 +50,12 @@ export class MockLLM implements LLMAdapter {
       text = `Alright, here's a proper answer: ${this.normalResponses[0]} There are a few approaches you could take, but the simplest is usually the best. Hope that helps. ok i'm going back to sleep now.`;
     }
 
-    // Add some variation based on the user's message
-    if (lastMessage.toLowerCase().includes("hello") || lastMessage.toLowerCase().includes("hi")) {
-      text = "hey... *yawn* what do you want?";
+    // Wake-word intent: respond deterministically with a wake-themed reply so
+    // greeting/wake-reaction behavior doesn't depend on random response text.
+    const greeting = lastMessage.toLowerCase().trim().replace(/[!.?]+$/, "");
+    const WAKE_WORDS = ["wake", "wake up", "awake", "hi", "hey", "hello", "up", "you up"];
+    if (WAKE_WORDS.includes(greeting)) {
+      text = "mmf... *yawn* i'm up, i'm up. what do you need?";
     }
 
     // Guarantee minimum length (16 chars) and respect maxTokens
