@@ -99,7 +99,7 @@ export function EffortBar() {
       <div className="flex-1">
         <label className="block text-xs text-cozy-dim mb-1 font-medium">
           Effort Level: {localEffort}
-          <span className="ml-2 font-normal opacity-60">
+          <span className="ml-2 font-normal opacity-80">
             {localEffort >= 70 ? "— actually trying" : localEffort >= 35 ? "— meh, fine" : "— please don't make me"}
           </span>
         </label>
