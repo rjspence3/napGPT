@@ -36,6 +36,25 @@ afterAll(async () => {
   resetRng();
 });
 
+// Clear persisted app state before each test. jest-puppeteer shares a single
+// page across all spec files, and the app persists chat history and nap state
+// to localStorage — without this, messages from one spec bleed into the next
+// (e.g. a11y.spec's message appearing in chat.e2e), which flakes depending on
+// jest's file ordering. Runs before each spec's own page.goto, so the reload
+// starts from a clean origin.
+beforeEach(async () => {
+  const page = (global as any).page;
+  if (!page) return;
+  try {
+    await page.evaluate(() => {
+      try { window.localStorage?.clear(); } catch {}
+      try { window.sessionStorage?.clear(); } catch {}
+    });
+  } catch {
+    // Page may be on about:blank (no storage origin yet) — nothing to clear.
+  }
+});
+
 // Global test utilities available to all tests
 (global as any).UI_ARTIFACT_DIR = artifactDir;
 (global as any).SCREENS_DIR = screensDir;

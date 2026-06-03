@@ -68,6 +68,7 @@ export function ChatWindow() {
   const energy = useNapStore((state) => state.energy);
   const consumeEnergy = useNapStore((state) => state.consumeEnergy);
   const updateIdle = useNapStore((state) => state.updateIdle);
+  const recordActivity = useNapStore((state) => state.recordActivity);
   const napTimerEnabled = useNapStore((state) => state.napTimerEnabled);
 
   const scrollToBottom = () => {
@@ -183,6 +184,7 @@ export function ChatWindow() {
 
     setInput("");
     updateIdle();
+    recordActivity();
 
     // Handle client-side commands (/nap, /recall)
     if (handleCommand(userMessage)) {
@@ -412,6 +414,7 @@ export function ChatWindow() {
             onChange={(e) => {
               setInput(e.target.value);
               updateIdle();
+              recordActivity();
             }}
             onKeyDown={handleKeyDown}
             placeholder="Type a message... (or /nap, /dream)"

@@ -30,6 +30,8 @@ export interface NapState extends BlanketState, CoffeeState {
   _boostIntervalId: ReturnType<typeof setInterval> | null;
   /** Current energy level (0-100) */
   energy: number;
+  /** Timestamp of the last user activity, for energy refill tracking (independent of nap timer) */
+  lastActivityAt: number;
   /** Timestamp when user became idle, or null if active */
   idleSince: number | null;
   /** Whether the user is currently considered "napping" (away) */
@@ -52,6 +54,8 @@ export interface NapState extends BlanketState, CoffeeState {
   toggleNapTimer: () => void;
   /** Manually sets napping state */
   setNapping: (napping: boolean) => void;
+  /** Records user activity (typing, sending) for energy refill tracking */
+  recordActivity: () => void;
   /** Updates idle state based on activity */
   updateIdle: () => void;
   /** Wakes from nap state (dismisses idle overlay) */
@@ -87,6 +91,7 @@ export const useNapStore = create<NapState>()(
     (set, get) => ({
       effort: 50,
       energy: ENERGY_MAX,
+      lastActivityAt: Date.now(),
       idleSince: null,
       isNapping: false,
       boostCooldown: 0,
@@ -116,13 +121,12 @@ export const useNapStore = create<NapState>()(
 
       /**
        * Refill energy gradually when idle
-       * Only refills if idle for at least 2 seconds
+       * Only refills if no user activity in the last 2 seconds
        */
       refillEnergy: () => {
         set((state) => {
-          // Only refill when idle (no recent activity)
-          // Consider idle if no activity in last 2 seconds
-          const isIdle = state.idleSince !== null && (Date.now() - state.idleSince) > 2000;
+          // Use lastActivityAt for idle detection — independent of the nap timer feature
+          const isIdle = (Date.now() - state.lastActivityAt) > 2000;
           if (state.energy < ENERGY_MAX && isIdle) {
             return {
               energy: Math.min(ENERGY_MAX, state.energy + ENERGY_REFILL_RATE),
@@ -130,6 +134,10 @@ export const useNapStore = create<NapState>()(
           }
           return state;
         });
+      },
+
+      recordActivity: () => {
+        set({ lastActivityAt: Date.now() });
       },
 
       /**
