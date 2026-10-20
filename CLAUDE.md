@@ -167,6 +167,8 @@ bumpers else you gutter ball."
   `git diff --cached --stat` before committing.
 - Commit messages name what changed and why. Write any message containing identifiers to a file and
   commit with `-F`: zsh command-substitutes backticks and silently deletes the identifier they wrap.
+- The git-discipline hook refuses: `git add .` / `-A` / `--all`, `git commit -a`, backticks in a
+  double-quoted `-m`, `--no-verify`, and force-pushing to main or master. Each refusal names the fix.
 - Avoid the literal word "credentials" in commit messages; the user-level action gate blocks it. Write
   "secrets-scan" or similar.
 - Gitignored files do not propagate to git worktrees. Copy them explicitly when parallelising.
@@ -191,4 +193,8 @@ bumpers else you gutter ball."
 - Code carries its own checks. Co-locate assertions and tests as the verification anchor.
 - Forbidden: `assert X, "X"` with the expression as its own message; `# type: ignore` or
   `# noqa` without a code and an inline reason; `cast()` where `isinstance` narrowing works.
+- The write gate refuses, at the moment of writing: a `.py` that will not compile, a `.json` that
+  will not parse, a bash `.sh` that fails `bash -n`, and on newly added Python lines a bare
+  `# type: ignore` or `# noqa`, a self-restating assert, or `except ...: pass` with no comment saying
+  why. Existing debt elsewhere in a file is never judged.
 <!-- END AGENT-DISCIPLINE -->
