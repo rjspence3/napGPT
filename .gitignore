@@ -59,3 +59,4 @@ docs/archive/
 docs/internal/
 tests/results/
 tests/screenshots/
+.claude/hooks-state/
